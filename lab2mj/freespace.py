@@ -1,7 +1,7 @@
 """Free-space plant-dynamics replay helpers for MuJoCo bundles.
 
 Library side of the no-contact parity test between IsaacLab (PhysX) and a
-converted bundle: ``scripts/dump_isaac_freespace.py`` records the Isaac
+converted bundle: ``lab2mj/isaac/dump_freespace.py`` records the Isaac
 reference and ``scripts/replay_freespace_mujoco.py`` drives these
 helpers. The replay isolates PLANT dynamics (mass / inertia / armature /
 joint friction / gravity / Coriolis):

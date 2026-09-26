@@ -503,7 +503,7 @@ def _print_summary(report: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bundle", required=True, help="Bundle directory from lab2mj.convert.")
-    parser.add_argument("--dump", required=True, help="Isaac reference dump npz (dump_isaac_reference.py).")
+    parser.add_argument("--dump", required=True, help="Isaac reference dump npz (lab2mj.isaac.dump_reference).")
     parser.add_argument("--out", required=True, help="Output directory for report.json and plots.")
     parser.add_argument(
         "--gates",

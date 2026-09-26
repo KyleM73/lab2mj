@@ -80,7 +80,7 @@ physics step ``t``. The initial state is stored separately per phase under
 npz schema (J = joints, B = bodies, T = num_steps; quaternions wxyz; joint
 arrays in Isaac/PhysX breadth-first order; ``root_lin_vel_w`` is the root
 CoM velocity, ``root_link_lin_vel_w`` the root link-origin velocity — same
-conventions as ``dump_isaac_reference.py``). Phase-specific keys are ALWAYS
+conventions as ``lab2mj.isaac.dump_reference``). Phase-specific keys are ALWAYS
 prefixed with the phase name; the ``phases`` key lists the recorded phases.
 
 ===============================  ========  =======================================
@@ -144,10 +144,10 @@ excited_phase_rad                (J,)      phi[j] excitation phases [rad]
 
 Example commands::
 
-    uv run python scripts/dump_isaac_freespace.py --robot spot --phase both \\
+    python -m lab2mj.isaac.dump_freespace --robot spot --phase both \\
         --out logs/freespace/spot_freespace.npz
 
-    uv run python scripts/dump_isaac_freespace.py --robot g1 --phase both \\
+    python -m lab2mj.isaac.dump_freespace --robot g1 --phase both \\
         --out logs/freespace/g1_freespace.npz
 """
 
@@ -155,7 +155,7 @@ Example commands::
 import argparse
 import sys
 
-from isaac_dump_common import ROBOT_CHOICES, launch_app
+from lab2mj.isaac.dump_common import ROBOT_CHOICES, launch_app
 
 PHASE_CHOICES = ("passive", "excited", "both")
 
@@ -201,7 +201,10 @@ from typing import Any
 import isaaclab.sim as sim_utils
 import numpy as np
 import torch
-from isaac_dump_common import (
+from isaaclab.assets import Articulation
+from isaaclab.utils.string import resolve_matching_names_values
+
+from lab2mj.isaac.dump_common import (
     append_state,
     load_robot_cfg,
     plant_record,
@@ -212,8 +215,6 @@ from isaac_dump_common import (
     written_init_state,
     zero_gain_implicit_actuators,
 )
-from isaaclab.assets import Articulation
-from isaaclab.utils.string import resolve_matching_names_values
 
 # PhysX rejects revolute limit angles outside [-2pi, 2pi] (setLimitParams error,
 # measured on anymal_c: a wider write was silently refused and the authored limits

@@ -1,0 +1,68 @@
+{
+  "_source": "Link masses and joint ranges of the hand-baked Spot MJCF used as the USD->MJCF regression reference (Boston Dynamics Spot description via spot_ros2 -> MuJoCo Menagerie -> per-leg calibrated limits). Only these scalars are kept; the model file itself is not shipped.",
+  "masses": {
+    "body": 16.7076511383,
+    "fl_hip": 1.13688337803,
+    "fl_uleg": 2.25620365143,
+    "fl_lleg": 0.330000013113,
+    "fr_hip": 1.13688337803,
+    "fr_uleg": 2.25620365143,
+    "fr_lleg": 0.330000013113,
+    "hl_hip": 1.13688337803,
+    "hl_uleg": 2.25620365143,
+    "hl_lleg": 0.330000013113,
+    "hr_hip": 1.13688337803,
+    "hr_uleg": 2.25620365143,
+    "hr_lleg": 0.330000013113
+  },
+  "ranges": {
+    "fl_hx": [
+      -0.785398,
+      0.785398
+    ],
+    "fl_hy": [
+      -0.898845,
+      2.29511
+    ],
+    "fl_kn": [
+      -2.7929,
+      -0.254402
+    ],
+    "fr_hx": [
+      -0.785398,
+      0.785398
+    ],
+    "fr_hy": [
+      -0.898845,
+      2.24363
+    ],
+    "fr_kn": [
+      -2.7929,
+      -0.255648
+    ],
+    "hl_hx": [
+      -0.785398,
+      0.785398
+    ],
+    "hl_hy": [
+      -0.898845,
+      2.29511
+    ],
+    "hl_kn": [
+      -2.7929,
+      -0.247067
+    ],
+    "hr_hx": [
+      -0.785398,
+      0.785398
+    ],
+    "hr_hy": [
+      -0.898845,
+      2.29511
+    ],
+    "hr_kn": [
+      -2.7929,
+      -0.248282
+    ]
+  }
+}

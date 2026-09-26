@@ -25,14 +25,14 @@ contact information).
 
 Usage::
 
-    uv run python scripts/dump_isaac_contact.py --robot spot \\
+    python -m lab2mj.isaac.dump_contact --robot spot \\
         --out logs/contact/spot_contact.npz
 """
 
 # Isaac Sim must launch before any isaaclab import (see CLAUDE.md: Import Ordering).
 import argparse
 
-from isaac_dump_common import ROBOT_CHOICES, launch_app
+from lab2mj.isaac.dump_common import ROBOT_CHOICES, launch_app
 
 parser = argparse.ArgumentParser(description="Dump passive contact-drop references for sim2sim contact parity.")
 parser.add_argument(
@@ -40,7 +40,7 @@ parser.add_argument(
     type=str,
     required=True,
     choices=ROBOT_CHOICES,
-    help="Robot articulation to dump (same registry as dump_isaac_freespace).",
+    help="Robot articulation to dump (same registry as dump_freespace).",
 )
 parser.add_argument("--physics_dt", type=float, default=0.005, help="Physics step [s].")
 parser.add_argument("--num_steps", type=int, default=120, help="Physics steps per phase (0.6 s at 5 ms).")
@@ -53,7 +53,9 @@ import os
 import isaaclab.sim as sim_utils
 import numpy as np
 import torch
-from isaac_dump_common import (
+from isaaclab.assets import Articulation
+
+from lab2mj.isaac.dump_common import (
     append_state,
     load_robot_cfg,
     plant_record,
@@ -64,7 +66,6 @@ from isaac_dump_common import (
     written_init_state,
     zero_gain_implicit_actuators,
 )
-from isaaclab.assets import Articulation
 
 DROP_LO_M = 0.02
 DROP_HI_M = 0.10

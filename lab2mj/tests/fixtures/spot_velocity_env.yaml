@@ -1029,7 +1029,7 @@ teleop_devices:
   devices: {}
 export_io_descriptors: false
 io_descriptors_output_dir: null
-log_dir: /home/user/contact_lab/logs/spot_velocity/2026-05-11_01-04-26_vanilla_a5090
+log_dir: /home/user/contact_lab/logs/spot_velocity/2026-05-11_01-04-26_vanilla
 is_finite_horizon: false
 episode_length_s: 20.0
 rewards:

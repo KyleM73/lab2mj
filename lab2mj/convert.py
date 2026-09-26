@@ -23,7 +23,7 @@ With ``--dump`` the converter cross-checks the bundle against an Isaac
 reference dump (joint order, per-body masses, env-0 origin, gravity) and
 reports mismatches as non-fatal warnings. If the dump carries a
 measured-terrain record (generator terrains dumped by
-``scripts/dump_isaac_reference.py``), the bundle terrain is built from
+``lab2mj/isaac/dump_reference.py``), the bundle terrain is built from
 that exact measured instance instead of procedural regeneration — the record
 is copied into the bundle (``assets/terrain_measured.npz``) and the manifest
 terrain entry gains ``source = "measured-from-dump"`` plus grid metadata (see

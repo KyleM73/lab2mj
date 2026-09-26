@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import json
 
 import mujoco
 import numpy as np
@@ -10,8 +10,8 @@ import pytest
 
 from .shared import FIXTURES, G1_USD, HAS_PXR, SPOT_USD, needs_g1  # noqa: F401
 
-# Hand-baked Spot MJCF (masses + calibrated joint ranges; mesh files are not needed).
-SPOT_BAKED_XML = FIXTURES / "spot_baked.xml"
+# Link masses + calibrated joint ranges extracted from the hand-baked Spot MJCF.
+SPOT_BAKED_VALUES = FIXTURES / "spot_baked_values.json"
 
 needs_spot = pytest.mark.skipif(
     not (HAS_PXR and SPOT_USD.exists()),
@@ -61,18 +61,9 @@ def g1():
 
 
 def _baked_spot_values() -> tuple[dict[str, float], dict[str, tuple[float, float]]]:
-    root = ET.parse(SPOT_BAKED_XML).getroot()
-    masses: dict[str, float] = {}
-    ranges: dict[str, tuple[float, float]] = {}
-    for body in root.iter("body"):
-        inertial = body.find("inertial")
-        if inertial is not None:
-            masses[body.get("name", "")] = float(inertial.get("mass", "nan"))
-        for joint in body.findall("joint"):
-            range_attr = joint.get("range")
-            if range_attr:
-                lo, hi = (float(v) for v in range_attr.split())
-                ranges[joint.get("name", "")] = (lo, hi)
+    baked = json.loads(SPOT_BAKED_VALUES.read_text())
+    masses = {name: float(mass) for name, mass in baked["masses"].items()}
+    ranges = {name: (float(lo), float(hi)) for name, (lo, hi) in baked["ranges"].items()}
     return masses, ranges
 
 

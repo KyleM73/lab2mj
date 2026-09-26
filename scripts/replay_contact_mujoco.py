@@ -95,7 +95,7 @@ def _replay_stiff(model, robot_map, manifest, dump, init, n_steps, substeps, sti
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bundle", required=True, help="Converted bundle of the same robot.")
-    parser.add_argument("--dump", required=True, help="Contact-drop dump npz (dump_isaac_contact.py).")
+    parser.add_argument("--dump", required=True, help="Contact-drop dump npz (lab2mj.isaac.dump_contact).")
     parser.add_argument("--out", default=None, help="Optional output dir for report.json.")
     args = parser.parse_args(argv)
 

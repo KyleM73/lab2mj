@@ -66,7 +66,7 @@ The procedural generator path above gives *statistical* parity only: tile conten
 drawn from IsaacLab's global RNG streams produces a different terrain instance, so
 strict trajectory gates against an Isaac reference dump cannot pass on it. When the
 reference dump carries a measured-terrain record (``terrain_mesh_vertices`` /
-``terrain_height_grid`` keys written by ``scripts/dump_isaac_reference.py``),
+``terrain_height_grid`` keys written by ``lab2mj/isaac/dump_reference.py``),
 :func:`build_terrain` accepts it via ``measured=`` and builds the terrain the
 reference robot actually walked on instead of regenerating procedurally:
 

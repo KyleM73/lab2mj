@@ -36,7 +36,7 @@ REPO = Path(__file__).resolve().parents[1]
 #   sim.device — runtime device string; matched via --device cuda:0 here.
 ALLOWLIST = {"log_dir", "io_descriptors_output_dir", "seed", "sim.device"}
 
-# (name, ground-truth glob relative to repo root, task id, extra dumper args).
+# (name, ground-truth glob -- `logs/...` relative to --logs_root, else to this repo -- task id, extra dumper args).
 # --train_physx_buffers replicates contact_lab train.py's PhysX buffer scaling and is
 # only used for runs trained through contact_lab's scripts/train.py.
 CASES: list[tuple[str, str, str, list[str]]] = [
@@ -139,7 +139,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--workdir", default=None, help="Directory for local dumps (default: temp dir).")
     parser.add_argument("--only", default=None, help="Regex filter on case name.")
+    parser.add_argument(
+        "--logs_root",
+        default=None,
+        help="Directory the `logs/...` ground-truth globs resolve against (default: this repo; "
+        "point it at the training project's checkout).",
+    )
     args = parser.parse_args(argv)
+    logs_root = Path(args.logs_root).expanduser().resolve() if args.logs_root else REPO
 
     workdir = Path(args.workdir) if args.workdir else Path(tempfile.mkdtemp(prefix="env_cfg_dumps_"))
     workdir.mkdir(parents=True, exist_ok=True)
@@ -148,7 +155,8 @@ def main(argv: list[str] | None = None) -> int:
     for name, ref_glob, task, extra in CASES:
         if args.only and not re.search(args.only, name):
             continue
-        matches = sorted(REPO.glob(ref_glob))
+        root = logs_root if ref_glob.startswith("logs/") else REPO
+        matches = sorted(root.glob(ref_glob))
         if not matches:
             results.append({"name": name, "task": task, "status": "NO GROUND TRUTH", "ref": ref_glob})
             continue

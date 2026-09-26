@@ -5,8 +5,8 @@ description: Layered diagnosis for lab2mj validation-gate failures — which pro
 
 # Diagnose sim2sim gate failures
 
-Work the layers in order; each isolates one error source. All replays run on
-mac CPU against pinned dumps.
+Work the layers in order; each isolates one error source. All replays run on a
+CPU-only machine against pinned dumps.
 
 ## Layer order
 

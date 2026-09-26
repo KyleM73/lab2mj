@@ -17,14 +17,13 @@ needed for conversion, `torch` for TorchScript policies / actuator nets, and
 ## Install
 
 ```bash
-# Standalone checkout (Python 3.11+, uv).
+# As a dependency of another project (e.g. the venv you train in).
+uv pip install "lab2mj[all] @ git+https://github.com/KyleM73/lab2mj.git"
+uv add "lab2mj[all] @ git+https://github.com/KyleM73/lab2mj.git"
+
+# Standalone checkout for development (Python 3.11+, uv).
 uv venv .venv --python 3.11 && source .venv/bin/activate
 make sync                      # uv sync --group dev --group isaac + scripts/fix_isaaclab_stubs.py
-
-# As a dependency of another project.
-uv add "lab2mj[all] @ git+ssh://git@github.com/KyleM73/lab2mj.git"
-uv pip install "lab2mj[all] @ git+ssh://git@github.com/KyleM73/lab2mj.git"
-uv pip install -e ../lab2mj    # local development copy
 ```
 
 The `lab2mj-*` commands below are console entry points: run them via `uv run`,
@@ -56,31 +55,49 @@ another project's venv rather than run from a checkout. Dumps are
 self-describing: task, policy path, seed, and commands reconstruct the exact dump
 invocation.
 
-## Protocol scripts (`scripts/`)
+## Protocol scripts
 
-Isaac-side dumpers need a GPU box with Isaac Sim + Isaac Lab (and, for
-`contact_lab` tasks, that package on the path); replays and analysis run on a
-CPU-only machine.
+Isaac-side dumpers live in the package (`lab2mj.isaac`) and run as modules from
+any venv that has lab2mj installed on a GPU box with Isaac Sim + Isaac Lab; for
+`contact_lab` tasks run them from a `contact_lab` checkout so its task registry
+imports. Everything else is under `scripts/` and runs on a CPU-only machine.
 
-| Script | Side | Purpose |
+| Entry point | Side | Purpose |
 | --- | --- | --- |
-| `dump_isaac_reference.py` | Isaac | Task rollout ground truth (the input to `lab2mj-validate`) |
-| `dump_isaac_freespace.py` | Isaac | Plant parity, no contact |
-| `dump_isaac_contact.py` | Isaac | Contact parity: passive + stiff drops |
-| `replay_freespace_mujoco.py` | MuJoCo | Counterpart of the free-space dump |
-| `replay_contact_mujoco.py` | MuJoCo | Counterpart of the contact dump |
-| `render_ghost_compare.py` | MuJoCo | MuJoCo rollout vs Isaac ghost video |
-| `aggregate_sim2sim_matrix.py` | MuJoCo | Matrix table + per-bundle distribution rollup |
-| `calibrate_contact.py` | MuJoCo | Offline contact-parameter sweep against a dump |
-| `one_step_parity.py` | MuJoCo | Per-step model error at matched states |
-| `compare_env_cfg_dumps.py` | either | Deep-compare shimmed env.yaml dumps against real on-box training dumps |
-
-Run the Isaac-side dumpers from the training project's venv with lab2mj
-installed, e.g. from a `contact_lab` checkout:
+| `python -m lab2mj.isaac.dump_reference` | Isaac | Task rollout ground truth (the input to `lab2mj-validate`) |
+| `python -m lab2mj.isaac.dump_freespace` | Isaac | Plant parity, no contact |
+| `python -m lab2mj.isaac.dump_contact` | Isaac | Contact parity: passive + stiff drops |
+| `scripts/replay_freespace_mujoco.py` | MuJoCo | Counterpart of the free-space dump |
+| `scripts/replay_contact_mujoco.py` | MuJoCo | Counterpart of the contact dump |
+| `scripts/render_ghost_compare.py` | MuJoCo | MuJoCo rollout vs Isaac ghost video |
+| `scripts/aggregate_sim2sim_matrix.py` | MuJoCo | Matrix table + per-bundle distribution rollup |
+| `scripts/calibrate_contact.py` | MuJoCo | Offline contact-parameter sweep against a dump |
+| `scripts/one_step_parity.py` | MuJoCo | Per-step model error at matched states |
+| `scripts/compare_env_cfg_dumps.py` | either | Deep-compare shimmed env.yaml dumps against real training dumps (`--logs_root`) |
 
 ```bash
-python ../lab2mj/scripts/dump_isaac_reference.py --task spot-velocity-v0 ... --out data/sim2sim_dumps/x.npz
+python -m lab2mj.isaac.dump_reference --task Isaac-Velocity-Flat-G1-v0 --policy policy.pt \
+    --command 0.7,0,0 --settle_steps 100 --record_physics_steps --seed 42 --out data/sim2sim_dumps/g1.npz
 ```
+
+## Robots
+
+The converter is robot-agnostic: any Isaac Lab manager-based task whose robot
+USD is Z-up and whose actuators are implicit PD, DC motor, delayed PD, remotized
+PD, or a TorchScript actuator net (LSTM / MLP) converts from its `env.yaml`. No
+robot assets ship in this repository — USDs and actuator nets download from the
+Isaac Lab asset server into `data/` on first conversion.
+
+Validated so far (reference dumps, free-space and contact parity):
+Unitree A1 / Go1 / Go2 / G1 / H1, ANYmal-B / C / D (incl. the ANYmal-C
+navigation task), Agility Cassie, and Boston Dynamics Spot (stock Isaac Lab
+velocity task and the `contact_lab` Spot tasks). The task-based reference dumper
+takes any gym task id; the robot-based parity dumpers (`dump_freespace`,
+`dump_contact`) use a small articulation-config registry in
+`lab2mj/isaac/dump_common.py` (Spot, G1, H1, A1, Go1, Go2, ANYmal-B/C/D) that a
+new robot is added to. Test fixtures are real
+`env.yaml` dumps for Spot, G1 (flat + rough deltas), and an ANYmal-C nav-like
+task.
 
 ## Tests
 
@@ -98,7 +115,17 @@ asset is absent from `data/`; the pure-numpy core (~250 tests) always runs.
 ```
 lab2mj/            library (numpy + mujoco + scipy + yaml; torch / pxr lazily)
   usd2mjcf/        USD -> MJCF parser, builder, verifier
+  isaac/           Isaac-side dumpers (`python -m lab2mj.isaac.dump_*`)
   tests/           offline pytest suite + env.yaml fixtures
-scripts/           Isaac-side dumpers and MuJoCo-side replay / analysis protocols
+scripts/           MuJoCo-side replay / analysis protocols, Isaac Lab stub fixup
+licenses/          third-party notices
 .claude/skills/    sim2sim-new-task, sim2sim-diagnose (Claude Code workflows)
 ```
+
+## License
+
+MIT (see `LICENSE`). `lab2mj/heightscan.py`, `lab2mj/terrain.py`, and the command
+terms in `lab2mj/commands.py` are numpy ports of Isaac Lab v2.3 semantics; Isaac
+Lab's BSD-3-Clause notice is reproduced in `licenses/isaaclab.txt`. Robot assets
+are not redistributed here; they download from NVIDIA's asset server under their
+own terms.

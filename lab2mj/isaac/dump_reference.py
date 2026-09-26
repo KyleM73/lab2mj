@@ -29,14 +29,14 @@ With ``--strict`` (default) the environment is made fully deterministic:
 Example commands::
 
     # Stock IsaacLab G1 velocity task with an rsl_rl-exported jit policy.
-    uv run python scripts/dump_isaac_reference.py \\
+    python -m lab2mj.isaac.dump_reference \\
         --task Isaac-Velocity-Flat-G1-v0 \\
         --policy logs/rsl_rl/g1_flat/<run>/exported/policy.pt \\
         --command 0.8,0.0,0.0 --num_steps 400 --seed 42 \\
         --out logs/sim2sim/g1_flat_reference.npz
 
     # contact_lab Spot velocity task with a contact_lab-exported jit policy.
-    uv run python scripts/dump_isaac_reference.py \\
+    python -m lab2mj.isaac.dump_reference \\
         --task spot-velocity-v0 \\
         --policy logs/spot_velocity/<run>/exported/policy.pt \\
         --command 1.0,0.0,0.0 \\
@@ -169,7 +169,7 @@ only matters if a termination fires, which already invalidates the reference
 # Isaac Sim must launch before any isaaclab import (see CLAUDE.md: Import Ordering).
 import argparse
 
-from isaac_dump_common import launch_app
+from lab2mj.isaac.dump_common import launch_app
 
 parser = argparse.ArgumentParser(description="Dump a deterministic Isaac reference trajectory for sim2sim validation.")
 parser.add_argument("--task", type=str, required=True, help="Manager-based task id (e.g. Isaac-Velocity-Flat-G1-v0).")
@@ -227,12 +227,13 @@ import gymnasium as gym
 import isaaclab_tasks  # noqa: F401
 import numpy as np
 import torch
-from isaac_dump_common import append_state, plant_record, shutdown
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.envs.mdp import reset_scene_to_default
 from isaaclab.managers import CommandTermCfg, EventTermCfg, ObservationGroupCfg
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab_tasks.utils import parse_env_cfg
+
+from lab2mj.isaac.dump_common import append_state, plant_record, shutdown
 
 
 def _parse_floats(spec: str, n: int, name: str) -> list[float]:

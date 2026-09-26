@@ -5,34 +5,35 @@ description: Onboard a new robot or task into the lab2mj sim2sim fleet — regis
 
 # Add a new robot/task to the sim2sim fleet
 
-Machine split: Isaac-side dumpers need the GPU box (`ssh a5090`; run them from
-the `~/contact_lab` venv with this repo checked out alongside at `~/lab2mj` and
-installed into that venv); conversion and every replay/validate run on mac CPU. The
-converter runs ONLY on mac — the remote venv's `pxr` is Isaac Sim's and needs a
-SimulationApp.
+Machine split: Isaac-side dumpers need a GPU box with Isaac Sim + Isaac Lab; run
+them as modules (`python -m lab2mj.isaac.dump_*`) from the training project's venv
+with lab2mj installed (for `contact_lab` tasks, from a `contact_lab` checkout so
+the task registry imports). Conversion and every replay/validate run on a
+CPU-only machine. The converter runs ONLY there — the Isaac venv's `pxr` is Isaac
+Sim's and needs a SimulationApp.
 
 ## 1. Registry entries (robot-based protocols)
 
-- `scripts/isaac_dump_common.py`: add the robot to `ROBOT_CHOICES` and
+- `lab2mj/isaac/dump_common.py`: add the robot to `ROBOT_CHOICES` and
   `load_robot_cfg` (import its articulation cfg; some cfgs are not re-exported
   from the `isaaclab_assets` root — import from the submodule).
-- `scripts/compare_env_cfg_dumps.py`: add a `CASES` row so the mac-local
-  config dump is checked against the on-box `env.yaml`.
+- `scripts/compare_env_cfg_dumps.py`: add a `CASES` row so the local config
+  dump is checked against the on-box `env.yaml` (`--logs_root <training checkout>`).
 
-Task-based dumps (`dump_isaac_reference.py`) need no registry — any gym task id
+Task-based dumps (`lab2mj.isaac.dump_reference`) need no registry — any gym task id
 works.
 
 ## 2. Dumps (GPU box)
 
 ```bash
 # Task reference (ground truth for the gates). Wrap in `timeout -k 10 420`.
-uv run python scripts/dump_isaac_reference.py --task <id> --policy <policy.pt> \
+python -m lab2mj.isaac.dump_reference --task <id> --policy <policy.pt> \
     --command 0.7,0.0,0.0 --settle_steps 100 --record_physics_steps --seed 42 --out <ref.npz>
 # Pose tasks: --pose_command=x,y,z,heading (`=` syntax for leading negatives).
 
 # Plant + contact parity (once per robot).
-uv run python scripts/dump_isaac_freespace.py --robot <name> --out <freespace.npz>
-uv run python scripts/dump_isaac_contact.py --robot <name> --out <contact.npz>
+python -m lab2mj.isaac.dump_freespace --robot <name> --out <freespace.npz>
+python -m lab2mj.isaac.dump_contact --robot <name> --out <contact.npz>
 ```
 
 Dumps are self-describing (task, policy path, seed, commands) — the exact
@@ -40,7 +41,7 @@ invocation is reconstructable from the npz. PhysX GPU rollouts are NOT
 run-to-run deterministic: pin dumps between comparisons; never attribute
 metric drift to code without a fixed dump.
 
-## 3. Convert + validate (mac)
+## 3. Convert + validate (CPU machine)
 
 ```bash
 uv run lab2mj-convert --run <run_dir> --dump <ref.npz>   # --dump: measured terrain + PhysX plant

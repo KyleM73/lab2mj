@@ -54,16 +54,22 @@ Everything under `data/` and `logs/` is gitignored:
 
 ## Protocol scripts
 
-`scripts/` holds the Isaac-side dumpers (`dump_isaac_reference.py`,
-`dump_isaac_freespace.py`, `dump_isaac_contact.py`, shared helpers in
-`isaac_dump_common.py`) and their MuJoCo-side counterparts / analysis tools.
-The dumpers need a GPU box with Isaac Sim; run them from the training project's
-venv with lab2mj installed (for `contact_lab` tasks, from a `contact_lab`
-checkout: `python ../lab2mj/scripts/dump_isaac_reference.py ...`). Everything
-else runs on mac CPU.
+Isaac-side dumpers are package modules under `lab2mj/isaac/` (`dump_reference`,
+`dump_freespace`, `dump_contact`, shared helpers in `dump_common.py`), run as
+`python -m lab2mj.isaac.dump_*` from whatever venv has lab2mj installed on the GPU
+box (for `contact_lab` tasks, from a `contact_lab` checkout so its registry
+imports). Never assume where that checkout lives. MuJoCo-side replay / analysis
+tools are under `scripts/` and run on a CPU-only machine.
 
 Isaac-side scripts follow the Isaac import order: stdlib / third-party, then the
 Kit app launch, then `isaaclab` imports, then task-package imports.
+
+## License
+
+MIT. `heightscan.py`, `terrain.py`, and the command terms in `commands.py` port
+Isaac Lab (BSD-3-Clause) semantics; keep `licenses/isaaclab.txt` and the README
+License section when adding further ports. Never commit robot assets (`data/` is
+gitignored) -- they download from NVIDIA's asset server.
 
 ## Skills
 

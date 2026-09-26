@@ -1,6 +1,6 @@
 """MuJoCo-side free-space plant-dynamics replay against an Isaac reference dump.
 
-Local-runnable counterpart to ``scripts/dump_isaac_freespace.py``: loads a
+Local-runnable counterpart to ``lab2mj/isaac/dump_freespace.py``: loads a
 converted bundle's scene model, strips everything that is not PLANT dynamics
 (see ``lab2mj.freespace`` for what that means; additionally
 ``model.opt.gravity`` is set from the dump), replays the dump's recorded
@@ -92,7 +92,7 @@ MARKS_S = (0.5, 1.0, 2.0)
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Replay an Isaac free-space dump in MuJoCo and report the divergence.")
     p.add_argument("--bundle", type=str, required=True, help="Converted MuJoCo bundle directory.")
-    p.add_argument("--dump", type=str, required=True, help="npz produced by dump_isaac_freespace.py.")
+    p.add_argument("--dump", type=str, required=True, help="npz produced by lab2mj.isaac.dump_freespace.")
     p.add_argument(
         "--out",
         type=str,
