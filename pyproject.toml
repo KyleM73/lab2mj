@@ -13,7 +13,7 @@ authors = [{ name = "Kyle Morgenstein" }]
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.24",
-    "mujoco>=3.1.3,<3.8",  # >=3.8 drops mjData.qM and breaks enum/int comparisons
+    "mujoco>=3.7",  # validated 3.7 - 3.14
     "scipy",
     "pyyaml",
 ]

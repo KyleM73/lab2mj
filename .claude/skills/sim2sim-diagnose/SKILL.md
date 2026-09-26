@@ -58,4 +58,5 @@ CPU-only machine against pinned dumps.
 
 Regression oracle for any runtime change: `spot_velocity` +
 `spot_vel_fwd_settled_phys.npz`, `--gates obs,open_loop` → obs 2.98e-08, open_loop 0.0302 rad
-exactly (plus bit-identical fixture re-conversion for converter changes).
+exactly (holds on MuJoCo 3.7 through 3.14; g1/h1 mesh-foot rows moved when 3.13 fixed
+the plane-mesh collider, so compare those against a same-version baseline) (plus bit-identical fixture re-conversion for converter changes).
