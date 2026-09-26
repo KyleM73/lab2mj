@@ -17,8 +17,6 @@ from .shared import SPOT_ENV_YAML
 # Keys a training run resolves at launch time; everything else must match exactly.
 RUNTIME_KEYS = ("log_dir", "io_descriptors_output_dir")
 
-# The shims wrap Isaac Lab's pure-python config layer (`uv sync --group isaac`); the Spot
-# task itself is registered by contact_lab, so that dump needs contact_lab importable too.
 needs_isaaclab = pytest.mark.skipif(importlib.util.find_spec("isaaclab") is None, reason="isaaclab not installed")
 needs_contact_lab = pytest.mark.skipif(
     importlib.util.find_spec("contact_lab") is None, reason="contact_lab not installed (registers spot-velocity-v0)"

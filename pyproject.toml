@@ -12,19 +12,14 @@ authors = [{ name = "Kyle Morgenstein" }]
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.24",
-    # Upper bound = the MuJoCo line contact_lab trains/validates against; newer releases
-    # drop mjData.qM (used by lab2mj.stiction) and change USD->MJCF joint compilation.
-    "mujoco>=3.1.3,<3.8",
+    "mujoco>=3.1.3,<3.8",  # >=3.8 drops mjData.qM and breaks enum/int comparisons
     "scipy",
     "pyyaml",
 ]
 
 [project.optional-dependencies]
-# USD -> MJCF conversion (lab2mj-convert, usd2mjcf). Pure-numpy runtime does not need it.
-usd = ["usd-core>=24.0"]
-# TorchScript policies / actuator nets (lab2mj-play, PreTrainedPolicyAction, LSTM/MLP nets).
-torch = ["torch>=2.0"]
-# Validation plots and ghost-compare rendering.
+usd = ["usd-core>=24.0"]      # conversion
+torch = ["torch>=2.0"]        # policies, actuator nets
 plot = ["matplotlib", "pillow"]
 all = ["lab2mj[usd,torch,plot]"]
 
@@ -35,17 +30,8 @@ lab2mj-validate = "lab2mj.validate:main"
 lab2mj-dump-env-cfg = "lab2mj.dump_env_cfg:main"
 
 [dependency-groups]
-# Full offline test suite (skips whatever assets under data/ are absent).
-dev = [
-    "lab2mj[all]",
-    "pytest",
-    "ruff",
-    # Only imported by the Isaac-side dumper scripts / dump_env_cfg; here so ty resolves them.
-    "gymnasium",
-    "omegaconf",
-]
-# Isaac Lab's pure-python config layer (no Isaac Sim), for lab2mj-dump-env-cfg under
-# isaac_shims and the tests that exercise it (test_cfg_dump_local, test_heightscan).
+dev = ["lab2mj[all]", "pytest", "ruff", "gymnasium", "omegaconf"]
+# Isaac Lab's pure-python config layer (no Isaac Sim) for dump_env_cfg and its tests.
 isaac = [
     "isaaclab",
     "isaaclab-tasks",
@@ -53,8 +39,7 @@ isaac = [
 ]
 
 [tool.uv]
-# isaaclab pins flatdict==4.0.1, whose sdist no longer builds (pkg_resources); same override as contact_lab.
-override-dependencies = ["flatdict==4.1.0"]
+override-dependencies = ["flatdict==4.1.0"]  # isaaclab's 4.0.1 pin no longer builds
 
 [tool.uv.sources]
 isaaclab = { git = "https://github.com/isaac-sim/IsaacLab.git", subdirectory = "source/isaaclab", tag = "v2.3.0" }
@@ -72,8 +57,7 @@ exclude = ["logs/*", "data/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-# E402: the Isaac-side dumper scripts must launch the Kit app before importing isaaclab.
-ignore = ["E402", "E203"]
+ignore = ["E402", "E203"]  # E402: Isaac scripts import after the Kit app launches
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
@@ -90,8 +74,7 @@ docstring-code-format = true
 testpaths = ["lab2mj/tests"]
 norecursedirs = ["scripts", "logs", "data"]
 
-# Treat as Any: C extensions without stubs and the Omniverse runtime that only exists on
-# the GPU box. isaaclab itself resolves via the `isaac` group + scripts/fix_isaaclab_stubs.py.
+# Stub-less C extensions and the GPU-box-only Omniverse runtime.
 [tool.ty.analysis]
 replace-imports-with-any = [
     "mujoco", "mujoco.**",
