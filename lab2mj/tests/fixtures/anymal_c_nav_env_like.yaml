@@ -1,0 +1,406 @@
+# Synthesized for tests: dump_yaml-shaped env.yaml for Isaac-Navigation-Flat-Anymal-C-v0,
+# transcribed from IsaacLab v2.3.0 sources (navigation/navigation_env_cfg.py [config/anymal_c],
+# locomotion/velocity/config/anymal_c/flat_env_cfg.py, isaaclab_assets ANYMAL_C_CFG /
+# ANYDRIVE_3_LSTM_ACTUATOR_CFG). Not produced by a real run; replace with a real
+# params/env.yaml dump once one exists. The `actions` and `velocity_commands` funcs inside
+# low_level_observations are the lambda source strings dump_yaml records when the config is
+# dumped after env construction (PreTrainedPolicyAction.__init__ rewrites those two terms).
+sim:
+  physics_prim_path: /physicsScene
+  device: cuda:0
+  dt: 0.005
+  render_interval: 4
+  gravity: !!python/tuple
+  - 0.0
+  - 0.0
+  - -9.81
+  physics_material:
+    func: isaaclab.sim.spawners.materials.physics_materials:spawn_rigid_body_material
+    static_friction: 1.0
+    dynamic_friction: 1.0
+    restitution: 0.0
+    friction_combine_mode: multiply
+    restitution_combine_mode: multiply
+    compliant_contact_stiffness: 0.0
+    compliant_contact_damping: 0.0
+seed: 42
+decimation: 40
+scene:
+  num_envs: 4096
+  env_spacing: 2.5
+  lazy_sensor_update: true
+  replicate_physics: true
+  robot:
+    class_type: isaaclab.assets.articulation.articulation:Articulation
+    prim_path: /World/envs/env_.*/Robot
+    spawn:
+      func: isaaclab.sim.spawners.from_files.from_files:spawn_from_usd
+      visible: true
+      semantic_tags: null
+      copy_from_source: true
+      mass_props: null
+      deformable_props: null
+      rigid_props:
+        rigid_body_enabled: null
+        kinematic_enabled: null
+        disable_gravity: false
+        linear_damping: 0.0
+        angular_damping: 0.0
+        max_linear_velocity: 1000.0
+        max_angular_velocity: 1000.0
+        max_depenetration_velocity: 1.0
+        max_contact_impulse: null
+        enable_gyroscopic_forces: null
+        retain_accelerations: false
+        solver_position_iteration_count: null
+        solver_velocity_iteration_count: null
+        sleep_threshold: null
+        stabilization_threshold: null
+      collision_props: null
+      activate_contact_sensors: true
+      scale: null
+      articulation_props:
+        articulation_enabled: null
+        enabled_self_collisions: true
+        solver_position_iteration_count: 4
+        solver_velocity_iteration_count: 0
+        sleep_threshold: null
+        stabilization_threshold: null
+        fix_root_link: null
+      fixed_tendons_props: null
+      joint_drive_props: null
+      visual_material_path: material
+      visual_material: null
+      usd_path: https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/IsaacLab/Robots/ANYbotics/ANYmal-C/anymal_c.usd
+      variants: null
+    init_state:
+      pos: !!python/tuple
+      - 0.0
+      - 0.0
+      - 0.6
+      rot: !!python/tuple
+      - 1.0
+      - 0.0
+      - 0.0
+      - 0.0
+      lin_vel: !!python/tuple
+      - 0.0
+      - 0.0
+      - 0.0
+      ang_vel: !!python/tuple
+      - 0.0
+      - 0.0
+      - 0.0
+      joint_pos:
+        .*HAA: 0.0
+        .*F_HFE: 0.4
+        .*H_HFE: -0.4
+        .*F_KFE: -0.8
+        .*H_KFE: 0.8
+      joint_vel:
+        .*: 0.0
+    collision_group: 0
+    debug_vis: false
+    soft_joint_pos_limit_factor: 0.95
+    actuators:
+      legs:
+        class_type: isaaclab.actuators.actuator_net:ActuatorNetLSTM
+        joint_names_expr:
+        - .*HAA
+        - .*HFE
+        - .*KFE
+        effort_limit: 80.0
+        velocity_limit: 7.5
+        effort_limit_sim: null
+        velocity_limit_sim: null
+        stiffness: null
+        damping: null
+        armature: null
+        friction: null
+        saturation_effort: 120.0
+        network_file: https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/IsaacLab/ActuatorNets/ANYbotics/anydrive_3_lstm_jit.pt
+  terrain:
+    class_type: isaaclab.terrains.terrain_importer:TerrainImporter
+    collision_group: -1
+    prim_path: /World/ground
+    num_envs: 4096
+    terrain_type: plane
+    terrain_generator: null
+    usd_path: null
+    env_spacing: 2.5
+    physics_material:
+      func: isaaclab.sim.spawners.materials.physics_materials:spawn_rigid_body_material
+      static_friction: 1.0
+      dynamic_friction: 1.0
+      restitution: 0.0
+      friction_combine_mode: multiply
+      restitution_combine_mode: multiply
+      compliant_contact_stiffness: 0.0
+      compliant_contact_damping: 0.0
+    max_init_terrain_level: 5
+    debug_vis: false
+  height_scanner: null
+  contact_forces:
+    class_type: isaaclab.sensors.contact_sensor.contact_sensor:ContactSensor
+    prim_path: /World/envs/env_.*/Robot/.*
+    update_period: 0.005
+    history_length: 3
+    debug_vis: false
+    track_pose: false
+    track_air_time: true
+    force_threshold: 1.0
+    filter_prim_paths_expr: []
+observations:
+  policy:
+    concatenate_terms: true
+    concatenate_dim: -1
+    enable_corruption: false
+    history_length: null
+    flatten_history_dim: true
+    base_lin_vel:
+      func: isaaclab.envs.mdp.observations:base_lin_vel
+      params: {}
+      modifiers: null
+      noise: null
+      clip: null
+      scale: null
+      history_length: 0
+      flatten_history_dim: true
+    projected_gravity:
+      func: isaaclab.envs.mdp.observations:projected_gravity
+      params: {}
+      modifiers: null
+      noise: null
+      clip: null
+      scale: null
+      history_length: 0
+      flatten_history_dim: true
+    pose_command:
+      func: isaaclab.envs.mdp.observations:generated_commands
+      params:
+        command_name: pose_command
+      modifiers: null
+      noise: null
+      clip: null
+      scale: null
+      history_length: 0
+      flatten_history_dim: true
+actions:
+  pre_trained_policy_action:
+    class_type: isaaclab_tasks.manager_based.navigation.mdp.pre_trained_policy_action:PreTrainedPolicyAction
+    asset_name: robot
+    debug_vis: true
+    clip: null
+    policy_path: https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/IsaacLab/Policies/ANYmal-C/Blind/policy.pt
+    low_level_decimation: 4
+    low_level_actions:
+      class_type: isaaclab.envs.mdp.actions.joint_actions:JointPositionAction
+      asset_name: robot
+      debug_vis: false
+      clip: null
+      joint_names:
+      - .*
+      scale: 0.5
+      offset: 0.0
+      preserve_order: false
+      use_default_offset: true
+    low_level_observations:
+      concatenate_terms: true
+      concatenate_dim: -1
+      enable_corruption: true
+      history_length: null
+      flatten_history_dim: true
+      base_lin_vel:
+        func: isaaclab.envs.mdp.observations:base_lin_vel
+        params: {}
+        modifiers: null
+        noise:
+          func: isaaclab.utils.noise.noise_model:uniform_noise
+          operation: add
+          n_min: -0.1
+          n_max: 0.1
+        clip: null
+        scale: null
+        history_length: 0
+        flatten_history_dim: true
+      base_ang_vel:
+        func: isaaclab.envs.mdp.observations:base_ang_vel
+        params: {}
+        modifiers: null
+        noise:
+          func: isaaclab.utils.noise.noise_model:uniform_noise
+          operation: add
+          n_min: -0.2
+          n_max: 0.2
+        clip: null
+        scale: null
+        history_length: 0
+        flatten_history_dim: true
+      projected_gravity:
+        func: isaaclab.envs.mdp.observations:projected_gravity
+        params: {}
+        modifiers: null
+        noise:
+          func: isaaclab.utils.noise.noise_model:uniform_noise
+          operation: add
+          n_min: -0.05
+          n_max: 0.05
+        clip: null
+        scale: null
+        history_length: 0
+        flatten_history_dim: true
+      velocity_commands:
+        func: 'lambda dummy_env: self._raw_actions'
+        params: {}
+        modifiers: null
+        noise: null
+        clip: null
+        scale: null
+        history_length: 0
+        flatten_history_dim: true
+      joint_pos:
+        func: isaaclab.envs.mdp.observations:joint_pos_rel
+        params: {}
+        modifiers: null
+        noise:
+          func: isaaclab.utils.noise.noise_model:uniform_noise
+          operation: add
+          n_min: -0.01
+          n_max: 0.01
+        clip: null
+        scale: null
+        history_length: 0
+        flatten_history_dim: true
+      joint_vel:
+        func: isaaclab.envs.mdp.observations:joint_vel_rel
+        params: {}
+        modifiers: null
+        noise:
+          func: isaaclab.utils.noise.noise_model:uniform_noise
+          operation: add
+          n_min: -1.5
+          n_max: 1.5
+        clip: null
+        scale: null
+        history_length: 0
+        flatten_history_dim: true
+      actions:
+        func: 'lambda dummy_env: last_action()'
+        params: {}
+        modifiers: null
+        noise: null
+        clip: null
+        scale: null
+        history_length: 0
+        flatten_history_dim: true
+      height_scan: null
+events:
+  reset_base:
+    func: isaaclab.envs.mdp.events:reset_root_state_uniform
+    params:
+      pose_range:
+        x: !!python/tuple
+        - -0.5
+        - 0.5
+        y: !!python/tuple
+        - -0.5
+        - 0.5
+        yaw: !!python/tuple
+        - -3.14
+        - 3.14
+      velocity_range:
+        x: !!python/tuple
+        - -0.0
+        - 0.0
+        y: !!python/tuple
+        - -0.0
+        - 0.0
+        z: !!python/tuple
+        - -0.0
+        - 0.0
+        roll: !!python/tuple
+        - -0.0
+        - 0.0
+        pitch: !!python/tuple
+        - -0.0
+        - 0.0
+        yaw: !!python/tuple
+        - -0.0
+        - 0.0
+    mode: reset
+    interval_range_s: null
+    is_global_time: false
+    min_step_count_between_reset: 0
+is_finite_horizon: false
+episode_length_s: 8.0
+rewards:
+  termination_penalty:
+    func: isaaclab.envs.mdp.rewards:is_terminated
+    params: {}
+    weight: -400.0
+  position_tracking:
+    func: isaaclab_tasks.manager_based.navigation.mdp.rewards:position_command_error_tanh
+    params:
+      std: 2.0
+      command_name: pose_command
+    weight: 0.5
+  position_tracking_fine_grained:
+    func: isaaclab_tasks.manager_based.navigation.mdp.rewards:position_command_error_tanh
+    params:
+      std: 0.2
+      command_name: pose_command
+    weight: 0.5
+  orientation_tracking:
+    func: isaaclab_tasks.manager_based.navigation.mdp.rewards:heading_command_error_abs
+    params:
+      command_name: pose_command
+    weight: -0.2
+terminations:
+  time_out:
+    func: isaaclab.envs.mdp.terminations:time_out
+    params: {}
+    time_out: true
+  base_contact:
+    func: isaaclab.envs.mdp.terminations:illegal_contact
+    params:
+      sensor_cfg:
+        name: contact_forces
+        joint_names: null
+        joint_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        fixed_tendon_names: null
+        fixed_tendon_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        body_names: base
+        body_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        preserve_order: false
+      threshold: 1.0
+    time_out: false
+commands:
+  pose_command:
+    class_type: isaaclab.envs.mdp.commands.pose_2d_command:UniformPose2dCommand
+    resampling_time_range: !!python/tuple
+    - 8.0
+    - 8.0
+    debug_vis: true
+    asset_name: robot
+    simple_heading: false
+    ranges:
+      pos_x: !!python/tuple
+      - -3.0
+      - 3.0
+      pos_y: !!python/tuple
+      - -3.0
+      - 3.0
+      heading: !!python/tuple
+      - -3.141592653589793
+      - 3.141592653589793
+    goal_pose_visualizer_cfg:
+      prim_path: /Visuals/Command/pose_goal

@@ -1,0 +1,7 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.inlayHints.variableTypes": false,
+    "python.analysis.inlayHints.functionReturnTypes": false,
+    "python.analysis.inlayHints.callArgumentNames": "off",
+    "editor.inlayHints.enabled": "off",
+}

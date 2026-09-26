@@ -1,0 +1,16 @@
+__pycache__/
+*.egg-info/
+**/.DS_Store
+.venv/
+*.lock
+.pytest_cache/
+.ruff_cache/
+
+# Downloaded assets, converted bundles, reference dumps, validation output.
+data/
+logs/
+
+# Local-only tooling state (checked-in skills excepted).
+.claude/*
+!.claude/skills/
+**/.ipynb_checkpoints/
