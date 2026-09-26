@@ -5,7 +5,7 @@ Isaac Lab -> MuJoCo sim2sim. Converts a manager-based training run (`params/env.
 validates the bundle against an Isaac reference dump. Robot-agnostic; no assets ship
 here (USDs and actuator nets download into `data/` on first conversion).
 
-Core deps: numpy, mujoco (<3.8), scipy, pyyaml. Extras: `usd` (conversion), `torch`
+Core deps: numpy, mujoco >=3.7, scipy, pyyaml. Extras: `usd` (conversion), `torch`
 (policies / actuator nets), `plot`, `all`.
 
 ## Install
@@ -37,11 +37,3 @@ python -m lab2mj.isaac.dump_contact   --robot <name> --out contact.npz     # con
 
 `scripts/` holds the MuJoCo-side replay, calibration, and aggregation counterparts.
 Bundles, dumps, and caches live under `data/` (gitignored; `LAB2MJ_DATA_DIR` overrides).
-
-## Develop
-
-```bash
-make test        # pytest, ~40 s; asset-dependent tests skip when data/ is empty
-make lint        # ruff
-make typecheck   # ty
-```
