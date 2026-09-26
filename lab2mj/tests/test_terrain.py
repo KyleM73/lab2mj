@@ -157,7 +157,7 @@ def test_plane_fixture_builds_and_compiles(fixture):
 
     ground_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "ground")
     foot_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "foot")
-    assert model.geom_type[ground_id] == mujoco.mjtGeom.mjGEOM_PLANE
+    assert int(model.geom_type[ground_id]) == int(mujoco.mjtGeom.mjGEOM_PLANE)
     # Fixture material: static_friction = 1.0, combine mode "multiply".
     assert model.geom_friction[ground_id, 0] == pytest.approx(1.0)
     # Friction mapping: PhysX multiply-combine gives mu_pair = mu_foot * mu_ground.

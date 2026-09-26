@@ -350,7 +350,7 @@ def build_robot_map(model: mujoco.MjModel, manifest: dict[str, Any]) -> RobotMap
 
     free_jid = -1
     for jid in range(model.njnt):
-        if model.jnt_type[jid] == mujoco.mjtJoint.mjJNT_FREE:
+        if int(model.jnt_type[jid]) == int(mujoco.mjtJoint.mjJNT_FREE):
             free_jid = jid
             break
     if free_jid < 0:

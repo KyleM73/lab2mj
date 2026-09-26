@@ -1,13 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.8.4,<0.10"]
+build-backend = "uv_build"
 
 [project]
 name = "lab2mj"
 version = "0.1.0"
 description = "Isaac Lab -> MuJoCo sim2sim converter, runtime, and validation harness for manager-based RL tasks"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE", "licenses/*"]
 authors = [{ name = "Kyle Morgenstein" }]
 requires-python = ">=3.11"
 dependencies = [
@@ -46,9 +47,10 @@ isaaclab = { git = "https://github.com/isaac-sim/IsaacLab.git", subdirectory = "
 isaaclab-tasks = { git = "https://github.com/isaac-sim/IsaacLab.git", subdirectory = "source/isaaclab_tasks", tag = "v2.3.0" }
 isaaclab-assets = { git = "https://github.com/isaac-sim/IsaacLab.git", subdirectory = "source/isaaclab_assets", tag = "v2.3.0" }
 
-[tool.setuptools.packages.find]
-include = ["lab2mj*"]
-exclude = ["lab2mj.tests*"]
+[tool.uv.build-backend]
+module-root = ""
+source-exclude = ["lab2mj/tests", "lab2mj/tests/**"]
+wheel-exclude = ["lab2mj/tests", "lab2mj/tests/**"]
 
 [tool.ruff]
 line-length = 120

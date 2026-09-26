@@ -269,8 +269,8 @@ class TestG1:
         robot, built = g1
         model = built.spec.compile()
         assert len(robot.isaac_joint_order) == 37
-        assert int((model.jnt_type == mujoco.mjtJoint.mjJNT_HINGE).sum()) == 37
-        assert int((model.jnt_type == mujoco.mjtJoint.mjJNT_FREE).sum()) == 1
+        assert int((model.jnt_type == int(mujoco.mjtJoint.mjJNT_HINGE)).sum()) == 37
+        assert int((model.jnt_type == int(mujoco.mjtJoint.mjJNT_FREE)).sum()) == 1
         assert bool((model.body_mass[1:] > 0).all())
 
     def test_verify_passes(self, g1):

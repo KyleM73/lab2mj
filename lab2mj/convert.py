@@ -359,7 +359,7 @@ def _joint_vel_limits(ir: EnvIR, isaac_joint_order: list[str]) -> np.ndarray:
 def _mj_joint_order(model: mujoco.MjModel) -> list[str]:
     order = []
     for jid in range(model.njnt):
-        if model.jnt_type[jid] in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE):
+        if int(model.jnt_type[jid]) in (int(mujoco.mjtJoint.mjJNT_HINGE), int(mujoco.mjtJoint.mjJNT_SLIDE)):
             order.append(model.joint(jid).name)
     return order
 

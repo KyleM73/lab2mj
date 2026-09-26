@@ -105,8 +105,11 @@ class JointStiction:
                     "the bundle was not produced by lab2mj.convert or is stale"
                 )
             model.dof_frictionloss[self.dof_adr] = self.dynamic
-            # Diagonal M_jj addresses in the sparse inertia: qM[dof_Madr[i]] == M[i, i].
-            self._m_diag_adr = model.dof_Madr[self.dof_adr]
+            # Addresses of the diagonal M_jj in the sparse inertia: legacy qM (< 3.3) or CSR M.
+            if hasattr(model, "M_rowadr"):
+                self._m_diag_adr = model.M_rowadr[self.dof_adr] + model.M_rownnz[self.dof_adr] - 1
+            else:
+                self._m_diag_adr = model.dof_Madr[self.dof_adr]
             # PhysX holds a captured joint at qd == 0 exactly (float32 noise); MuJoCo's
             # DEFAULT friction-row regularization lets a loaded stuck joint creep at
             # ~mrad/s, which mis-times the breakaway (measured: a 5 mrad creep shifted
@@ -143,7 +146,7 @@ class JointStiction:
         """
         if not self.active:
             return
-        m_diag = data.qM[self._m_diag_adr]
+        m_diag = (data.M if hasattr(data, "M") else data.qM)[self._m_diag_adr]
         qd = np.abs(data.qvel[self.dof_adr])
         slipping = qd > SLIP_EPS
         # |qd| <= static * physics_dt / M_jj, in multiply form (all quantities >= 0).
