@@ -798,6 +798,7 @@ class MjEnv:
             contact_sensors=self.manifest["contact_sensors"],
             gravity_dir_w=self._gravity_dir_w,
             entity=self._robot_entity,
+            geom_map=self.robot_map.geom_ids,
         )
 
     def _check_implicit_damping(self) -> tuple[np.ndarray, np.ndarray]:

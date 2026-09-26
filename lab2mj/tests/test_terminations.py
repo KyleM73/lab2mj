@@ -85,6 +85,54 @@ def test_multimap_dedupes_welded_bodies():
     np.testing.assert_allclose(history[0, 0], [0.0, 0.0, 2.0 * 9.81], atol=0.5)
 
 
+FOLDED_XML = """
+<mujoco>
+  <option timestep="0.005"/>
+  <worldbody>
+    <geom name="floor" type="plane" size="5 5 0.1"/>
+    <body name="lleg" pos="0 0 0.3">
+      <freejoint/>
+      <geom name="shin" type="capsule" fromto="0 0 0.3 0 0 0.1" size="0.02" mass="1.0"/>
+      <geom name="foot" type="sphere" size="0.03" mass="1.0"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_geom_map_separates_folded_bodies():
+    # usd2mjcf folds a welded child (Spot's *_foot) into its parent's mj body (*_lleg). Isaac's
+    # sensor still reports them as separate bodies, so foot contact must not count as lleg contact.
+    model = mujoco.MjModel.from_xml_string(FOLDED_XML)
+    data = mujoco.MjData(model)
+    for _ in range(400):
+        mujoco.mj_step(model, data)
+    bid = model.body("lleg").id
+    body_map = {"lleg": [bid], "foot": [bid]}
+    geom_map = {"lleg": [model.geom("shin").id], "foot": [model.geom("foot").id]}
+    state = make_state(pos=data.qpos[:3], quat=data.qpos[3:7])
+
+    def build(body_names, **kw):
+        return TerminationSet(
+            [term("body_contact", "illegal_contact", {"sensor_cfg": {"body_names": body_names}, "threshold": 1.0})],
+            step_dt=0.02,
+            episode_length_s=20.0,
+            body_map=body_map,
+            **kw,
+        )
+
+    assert build(".*leg", geom_map=geom_map).check(model, data, state, 0.02) == (False, False, [])
+    assert build("foot", geom_map=geom_map).check(model, data, state, 0.02)[2] == ["body_contact"]
+    ts = build(["lleg", "foot"], geom_map=geom_map)
+    assert ts.tracked == ["lleg", "foot"]
+    history = ts._contact_history(model, data)
+    assert history is not None
+    np.testing.assert_allclose(history[0, 0], 0.0, atol=1e-9)
+    np.testing.assert_allclose(history[0, 1], [0.0, 0.0, 2.0 * 9.81], atol=0.5)
+    # Without geom_map the folded mj body is one row, so foot contact trips the lleg term.
+    assert build(".*leg").check(model, data, state, 0.02)[2] == ["body_contact"]
+
+
 # ---------------------------------------------------------------------------------------
 # Individual terms
 # ---------------------------------------------------------------------------------------
@@ -141,7 +189,7 @@ def test_sensor_cfg_resolves_against_sensor_tracked_bodies():
         body_map=body_map,
         contact_sensors=sensors,
     )
-    assert ts.tracked_body_ids == [box_id]  # body_names=None matches the sensor subset, not 'base'
+    assert ts.tracked == [box_id]  # body_names=None matches the sensor subset, not 'base'
     # A pattern reaching only untracked bodies raises (Isaac raises on no-match too).
     with pytest.raises(ValueError, match="match none"):
         TerminationSet(
@@ -352,7 +400,7 @@ def test_every_fixture_termination_builds_and_checks(fixture, body_names):
     )
     # Contact terms resolved a non-empty body set from the fixture patterns.
     contact_terms = [t for t in ts._terms if t.func in ("illegal_contact", "vertical_contact")]
-    assert contact_terms and all(t.body_ids for t in contact_terms)
+    assert contact_terms and all(t.rows for t in contact_terms)
 
     model = mujoco.MjModel.from_xml_string(BOX_XML)
     data = mujoco.MjData(model)
@@ -373,5 +421,17 @@ def test_spot_fixture_illegal_contact_matches_body_and_legs():
         body_map=body_map,
     )
     (contact_term,) = [t for t in ts._terms if t.func == "illegal_contact"]
-    matched = {name for name, ids in body_map.items() if ids[0] in contact_term.body_ids}
-    assert matched == {"body", "fl_uleg", "fr_uleg", "hl_uleg", "hr_uleg", "fl_lleg", "fr_lleg", "hl_lleg", "hr_lleg"}
+    matched = {name for name, ids in body_map.items() if ids[0] in contact_term.rows}
+    expected = {"body", "fl_uleg", "fr_uleg", "hl_uleg", "hr_uleg", "fl_lleg", "fr_lleg", "hl_lleg", "hr_lleg"}
+    assert matched == expected
+    # With geom_map the term tracks the Isaac bodies by name (the feet stay out).
+    geom_map = {name: [i] for i, name in enumerate(SPOT_BODY_NAMES)}
+    ts = TerminationSet(
+        ir.terminations,
+        step_dt=ir.timing.policy_dt,
+        episode_length_s=ir.timing.episode_length_s,
+        body_map=body_map,
+        geom_map=geom_map,
+    )
+    (contact_term,) = [t for t in ts._terms if t.func == "illegal_contact"]
+    assert set(contact_term.rows) == expected
