@@ -44,6 +44,8 @@ class TestClassNameParsing:
         assert actuator_model_from_class("isaaclab.actuators.actuator_pd:IdealPDActuator") == "ideal_pd"
         assert actuator_model_from_class("isaaclab.actuators.actuator_pd:DelayedPDActuator") == "delayed_pd"
         assert actuator_model_from_class("isaaclab.actuators.actuator_pd:RemotizedPDActuator") == "remotized_pd"
+        assert actuator_model_from_class("contact_lab.assets.actuators:SyncFreeDelayedPDActuator") == "delayed_pd"
+        assert actuator_model_from_class("contact_lab.assets.actuators:SyncFreeRemotizedPDActuator") == "remotized_pd"
 
 
 class TestSpotTiming:

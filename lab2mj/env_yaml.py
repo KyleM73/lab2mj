@@ -39,6 +39,8 @@ _ACTUATOR_MODELS: dict[str, ActuatorModel] = {
     "IdealPDActuator": "ideal_pd",
     "DelayedPDActuator": "delayed_pd",
     "RemotizedPDActuator": "remotized_pd",
+    "SyncFreeDelayedPDActuator": "delayed_pd",
+    "SyncFreeRemotizedPDActuator": "remotized_pd",
     "DCMotor": "dc_motor",
     "ActuatorNetLSTM": "actuator_net_lstm",
     "ActuatorNetMLP": "actuator_net_mlp",
