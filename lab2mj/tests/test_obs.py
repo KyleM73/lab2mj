@@ -398,3 +398,27 @@ def test_ctx_arrays_not_mutated():
     before = ctx.joint_vel_isaac.copy()
     np.testing.assert_allclose(pipeline.compute(ctx), [10.0, -10.0, 5.0])
     np.testing.assert_array_equal(ctx.joint_vel_isaac, before)
+
+
+PHASE = "contact_lab.tasks.base_wrench.g1.mdp.observations:phase"
+
+
+def test_gait_phase_sin_cos_and_no_gait():
+    term = ObsTermIR(name="phase_command", func=PHASE, params={"command_name": "frequency"})
+    pipeline = ObsPipeline(
+        single_term_group(term), num_joints=1, action_dim=1, command_dims={"frequency": 2}, enable_noise=False
+    )
+    ctx = make_ctx(1, 1, commands={"frequency": np.array([1.8, 0.25])})
+    np.testing.assert_allclose(pipeline.compute(ctx, np.random.default_rng(0)), [1.0, 0.0], atol=1e-6)
+    # contact_lab's gait_state reports phase 0 when no gait is commanded.
+    ctx = make_ctx(1, 1, commands={"frequency": np.array([0.0, 0.25])})
+    np.testing.assert_allclose(pipeline.compute(ctx, np.random.default_rng(0)), [0.0, 1.0], atol=1e-6)
+
+
+def test_gait_phase_requires_frequency_command_and_command_source():
+    term = ObsTermIR(name="phase_command", func=PHASE, params={})
+    with pytest.raises(ValueError, match="frequency, phase"):
+        ObsPipeline(single_term_group(term), num_joints=1, action_dim=1, command_dims={"base_velocity": 3})
+    action_term = ObsTermIR(name="phase_command", func=PHASE, params={"source": "action"})
+    with pytest.raises(ValueError, match="action"):
+        ObsPipeline(single_term_group(action_term), num_joints=1, action_dim=1, command_dims={"frequency": 2})

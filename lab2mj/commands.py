@@ -350,6 +350,55 @@ class UniformScalarCommand(CommandGenerator):
         pass
 
 
+class FrequencyCommand(CommandGenerator):
+    """Gait frequency and its integrated phase, ``[frequency, phase]`` (shape ``(2,)``).
+
+    Port of contact_lab's ``FrequencyCommand``: a resample draws the frequency (Hz) from
+    ``range`` and a phase uniformly from ``[0, 1)``; every step the phase then advances
+    by ``frequency * dt`` and wraps to ``[0, 1)`` (after any resample, like the command
+    manager's ``compute``). A pinned command fixes the frequency, and optionally the
+    initial phase (``(1,)``: ``[frequency]`` starting at phase 0; ``(2,)``:
+    ``[frequency, phase0]``); the phase keeps integrating.
+    """
+
+    def __init__(
+        self,
+        resampling_time_range: tuple[float, float],
+        *,
+        range: tuple[float, float],
+        strict: bool = False,
+        fixed_command: Any = None,
+    ) -> None:
+        if fixed_command is not None and np.asarray(fixed_command).shape == (1,):
+            fixed_command = np.array([np.asarray(fixed_command, dtype=np.float64)[0], 0.0])
+        super().__init__(resampling_time_range, strict=strict, fixed_command=fixed_command)
+        self.range = _range(range)
+        if min(self.range) < 0.0:
+            raise ValueError(f"FrequencyCommand range must be non-negative, got {self.range}")
+        self.value = np.array([1.0, 1.0], dtype=np.float64)
+
+    @property
+    def command(self) -> np.ndarray:
+        return self.value
+
+    def step(self, dt: float, robot_state: RobotState, rng: np.random.Generator) -> None:
+        super().step(dt, robot_state, rng)
+        self.value[1] = (self.value[1] + self.value[0] * dt) % 1.0
+
+    def _pin_command(self, fixed: np.ndarray) -> None:
+        if fixed.shape != (2,):
+            raise ValueError(f"frequency fixed_command must have shape (1,) or (2,), got {fixed.shape}")
+        self.value = fixed.copy()
+        self.value[1] %= 1.0
+
+    def _resample_command(self, rng: np.random.Generator, robot_state: RobotState) -> None:
+        self.value[0] = rng.uniform(*self.range)
+        self.value[1] = rng.uniform(0.0, 1.0)
+
+    def _update_command(self, robot_state: RobotState) -> None:
+        pass  # the phase integrates in step(), which knows dt; retarget() must not advance it
+
+
 # ---------------------------------------------------------------------------------------
 # Factory.
 # ---------------------------------------------------------------------------------------
@@ -364,6 +413,7 @@ COMMAND_DIMS: dict[str, int] = {
     "TerrainBasedPose2dCommand": 4,
     "VelocityLimitCommand": 1,
     "ContactSafetyThresholdCommand": 1,
+    "FrequencyCommand": 2,
 }
 
 KNOWN_COMMAND_TYPES = tuple(COMMAND_DIMS)
@@ -401,7 +451,8 @@ def build_command(
         patch_sampler: Flat-patch sampler, required for ``TerrainBasedPose2dCommand``.
         strict: Require a ``fixed_command`` (sim2sim eval).
         fixed_command: Pinned command (in or out of strict mode); velocity ``(3,)``,
-            pose world goal ``(4,)``, scalar ``(1,)``. ``None`` samples normally.
+            pose world goal ``(4,)``, scalar ``(1,)``, gait frequency ``(1,)`` or
+            ``(2,)`` (with the initial phase). ``None`` samples normally.
     """
     p = ir.params
     common: dict[str, Any] = {"strict": strict, "fixed_command": fixed_command}
@@ -447,4 +498,6 @@ def build_command(
         )
     if ir.type in ("VelocityLimitCommand", "ContactSafetyThresholdCommand"):
         return UniformScalarCommand(resampling, range=_range(_require_param(p, "range", ir)), **common)
+    if ir.type == "FrequencyCommand":
+        return FrequencyCommand(resampling, range=_range(_require_param(p, "range", ir)), **common)
     raise ValueError(f"unsupported command type '{ir.type}' (known: {list(KNOWN_COMMAND_TYPES)})")

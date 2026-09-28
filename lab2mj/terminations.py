@@ -47,6 +47,7 @@ KNOWN_TERMINATION_FUNCS = (
     "time_out",
     "illegal_contact",
     "bad_orientation",
+    "body_bad_orientation",
     "root_height_below_minimum",
     "terrain_out_of_bounds",
     "vertical_contact",
@@ -188,6 +189,12 @@ class TerminationSet:
                 ir.params.get("asset_cfg"), f"termination '{ir.name}'", entity=entity, check_selectors=False
             )
             term = _Term(name=ir.name, func=func, time_out=ir.time_out, params=dict(ir.params))
+            if func == "body_bad_orientation":
+                asset_cfg = ir.params.get("asset_cfg") or {}
+                names = resolve_names(asset_cfg.get("body_names"), list(body_map))
+                if not names:
+                    raise ValueError(f"termination '{ir.name}': asset_cfg.body_names matches no body")
+                term.rows = [(name, body_map[name][0]) for name in names]
             if func in _CONTACT_FUNCS:
                 sensor_cfg = ir.params.get("sensor_cfg") or {}
                 check_scene_entity_cfg(sensor_cfg, f"termination '{ir.name}' sensor_cfg", entity=None)
@@ -209,6 +216,8 @@ class TerminationSet:
         self._geom_map = geom_map
         self._tracked: list[Any] = []
         for term in self._terms:
+            if term.func not in _CONTACT_FUNCS:
+                continue
             for key in term.rows:
                 if key not in self._tracked:
                     self._tracked.append(key)
@@ -218,6 +227,7 @@ class TerminationSet:
         history = max([t.window for t in self._terms if t.func in _CONTACT_FUNCS] + [1])
         self._history: deque[np.ndarray] = deque(maxlen=history)
         self._geom_index: np.ndarray | None = None  # (ngeom,) tracked-row lookup, built on first use
+        self._body_frames_checked = False
 
     @property
     def tracked(self) -> list[Any]:
@@ -260,6 +270,8 @@ class TerminationSet:
         """
         episode_steps = int(round(episode_t / self._step_dt))
         forces_history = self._contact_history(model, data)
+        if not self._body_frames_checked:
+            self._check_body_frames(model)
         terminated = False
         timed_out = False
         reasons: list[str] = []
@@ -274,6 +286,20 @@ class TerminationSet:
         return terminated, timed_out, reasons
 
     # -- internals ------------------------------------------------------------------
+
+    def _check_body_frames(self, model: mujoco.MjModel) -> None:
+        """Per-body orientation terms need the Isaac link's own frame: a link the converter
+        welded into another mj body only has that body's frame, which differs by the weld."""
+        for term in self._terms:
+            if term.func != "body_bad_orientation":
+                continue
+            for name, bid in term.rows:
+                if model.body(bid).name != name:
+                    raise NotImplementedError(
+                        f"termination '{term.name}': body '{name}' is welded into mj body "
+                        f"'{model.body(bid).name}'; its own orientation is not tracked"
+                    )
+        self._body_frames_checked = True
 
     def _contact_history(self, model: mujoco.MjModel, data: mujoco.MjData) -> np.ndarray | None:
         if not self._tracked:
@@ -313,6 +339,15 @@ class TerminationSet:
             projected_gravity_b = quat_apply_inverse(state.root_quat_w_wxyz, self._gravity_dir_w)
             angle = math.acos(float(np.clip(-projected_gravity_b[2], -1.0, 1.0)))
             return abs(angle) > float(params["limit_angle"])
+        if term.func == "body_bad_orientation":
+            # contact_lab's per-body variant: angle between each selected body's
+            # projected gravity and its -z axis; any body over the limit terminates.
+            limit = float(params["limit_angle"])
+            for _, bid in term.rows:
+                projected_gravity_b = data.xmat[bid].reshape(3, 3).T @ self._gravity_dir_w
+                if abs(math.acos(float(np.clip(-projected_gravity_b[2], -1.0, 1.0)))) > limit:
+                    return True
+            return False
         if term.func == "root_height_below_minimum":
             return float(state.root_pos_w[2]) < float(params["minimum_height"])
         if term.func == "terrain_out_of_bounds":

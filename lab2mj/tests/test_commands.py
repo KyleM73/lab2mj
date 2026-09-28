@@ -346,3 +346,56 @@ class TestRegistryAndParamErrors:
         ir = CommandIR(name="base_velocity", type="UniformVelocityCommand", params={})
         with pytest.raises(ValueError, match="base_velocity.*resampling_time_range"):
             build_command(ir)
+
+
+# ---------------------------------------------------------------------------------------
+# Gait frequency command (contact_lab FrequencyCommand)
+# ---------------------------------------------------------------------------------------
+
+
+def _frequency_ir(freq_range=(1.0, 2.4), resampling=(3.0, 12.0)) -> CommandIR:
+    return CommandIR(
+        name="frequency",
+        type="FrequencyCommand",
+        params={"resampling_time_range": list(resampling), "range": list(freq_range)},
+    )
+
+
+def test_frequency_command_integrates_and_wraps_phase():
+    gen = build_command(_frequency_ir(), fixed_command=[1.8])
+    rng = np.random.default_rng(0)
+    state = make_state()
+    gen.reset(rng, state)
+    np.testing.assert_array_equal(gen.command, [1.8, 0.0])
+    dt = 0.02
+    for k in range(1, 40):
+        gen.step(dt, state, rng)
+        assert gen.command[0] == 1.8
+        assert gen.command[1] == pytest.approx((k * 1.8 * dt) % 1.0, abs=1e-12)
+        assert 0.0 <= gen.command[1] < 1.0
+    gen.retarget(state)  # re-running the post-processing must not advance the phase
+    assert gen.command[1] == pytest.approx((39 * 1.8 * dt) % 1.0, abs=1e-12)
+
+
+def test_frequency_command_pin_with_initial_phase():
+    gen = build_command(_frequency_ir(), strict=True, fixed_command=[2.0, 1.25])
+    gen.reset(np.random.default_rng(0), make_state())
+    np.testing.assert_allclose(gen.command, [2.0, 0.25])
+    with pytest.raises(ValueError, match="shape"):
+        build_command(_frequency_ir(), fixed_command=[1.0, 0.0, 0.0]).reset(np.random.default_rng(0), make_state())
+
+
+def test_frequency_command_resample_then_advance():
+    # Isaac's compute(): resample (frequency and a fresh phase) first, then advance by f * dt.
+    gen = build_command(_frequency_ir(resampling=(1.0, 1.0)))
+    rng = np.random.default_rng(3)
+    state = make_state()
+    gen.reset(rng, state)
+    assert 1.0 <= gen.command[0] <= 2.4 and 0.0 <= gen.command[1] < 1.0
+    probe = np.random.default_rng(3)
+    probe.uniform(1.0, 1.0), probe.uniform(1.0, 2.4), probe.uniform(0.0, 1.0)  # the reset draws
+    gen.step(1.0, state, rng)  # clock hits zero: resample, then advance
+    _, freq, phase0 = probe.uniform(1.0, 1.0), probe.uniform(1.0, 2.4), probe.uniform(0.0, 1.0)
+    np.testing.assert_allclose(gen.command, [freq, (phase0 + freq * 1.0) % 1.0])
+    with pytest.raises(ValueError, match="non-negative"):
+        build_command(_frequency_ir(freq_range=(-1.0, 1.0)))

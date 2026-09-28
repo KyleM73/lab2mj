@@ -62,7 +62,10 @@ _KNOWN_FUNCS = (
     "last_action",
     "generated_commands",
     "command_time_remaining",
+    "phase",
 )
+# contact_lab's ``gait_state`` reports phase 0 below this commanded frequency (no gait).
+_GAIT_FREQ_EPS = 1e-6
 
 
 def extras_term_names(group: ObsGroupIR) -> list[str]:
@@ -475,6 +478,23 @@ class ObsPipeline:
                 return np.array([value], dtype=np.float32)
 
             return eval_time_remaining, 1
+        if func_name == "phase":
+            # contact_lab gait phase: [sin, cos](2 pi phase) of a [frequency, phase] command.
+            if term.params.get("source", "command") != "command":
+                raise ValueError(f"obs term '{label}': phase from a gait-frequency action is not supported")
+            command_name = term.params.get("command_name", "frequency")
+            if command_dims.get(command_name) != 2:
+                raise ValueError(
+                    f"obs term '{label}': phase needs a [frequency, phase] command '{command_name}' "
+                    f"(command dims: {command_dims})"
+                )
+
+            def eval_phase(ctx: ObsContext, _name: str = command_name) -> np.ndarray:
+                freq, phase = ctx.commands[_name][:2]
+                phase = 0.0 if abs(freq) < _GAIT_FREQ_EPS else phase
+                return np.array([np.sin(2.0 * np.pi * phase), np.cos(2.0 * np.pi * phase)], dtype=np.float32)
+
+            return eval_phase, 2
         if func_name in _EXTRAS_FUNCS:
             if term.name not in extras_dims:
                 raise ValueError(

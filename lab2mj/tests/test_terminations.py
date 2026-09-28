@@ -313,6 +313,30 @@ def test_bad_orientation():
     assert build(0.4).check(model, data, make_state(), 0.02)[0] is False
 
 
+def test_body_bad_orientation_uses_the_selected_body_frame():
+    model = mujoco.MjModel.from_xml_string(BOX_XML)
+    data = mujoco.MjData(model)
+    box_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "box")
+    data.qpos[3:7] = quat_from_euler_xyz(0.5, 0.0, 0.0)
+    mujoco.mj_kinematics(model, data)
+    upright_root = make_state()  # the root state is ignored: the term reads the body's own frame
+
+    def build(limit_angle, body_map):
+        params = {"limit_angle": limit_angle, "asset_cfg": {"name": "robot", "body_names": ["box"]}}
+        return TerminationSet(
+            [term("tilt", "body_bad_orientation", params, module="contact_lab.tasks.base_wrench.g1.mdp.terminations")],
+            step_dt=0.02,
+            episode_length_s=20.0,
+            body_map=body_map,
+        )
+
+    assert build(0.4, {"box": [box_id]}).check(model, data, upright_root, 0.02)[0] is True
+    assert build(0.6, {"box": [box_id]}).check(model, data, upright_root, 0.02)[0] is False
+    welded = {"box": [0]}  # an Isaac body folded into another mj body (here: the world)
+    with pytest.raises(NotImplementedError, match="welded"):
+        build(0.4, welded).check(model, data, upright_root, 0.02)
+
+
 def test_root_height_below_minimum():
     model = mujoco.MjModel.from_xml_string(BOX_XML)
     data = mujoco.MjData(model)

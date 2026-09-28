@@ -589,3 +589,35 @@ def test_g1_fixture_events_apply_on_toy_model():
     for gs in robot_map.geom_ids.values():
         for g in gs:
             assert model.geom_friction[g, 0] == pytest.approx(0.8)
+
+
+def test_reset_mass_event_keeps_the_robot_state():
+    # mj_setConst evaluates at qpos0 and leaves it in the data it is given: the refresh
+    # after a reset/interval mass event must not teleport the robot.
+    model, data, robot_map = make_model_and_map()
+    data.qpos[:3] = [1.0, 2.0, 3.0]
+    data.qpos[robot_map.qpos_adr] = [0.2, -0.3]
+    before = data.qpos.copy()
+    ev = event(
+        "base_mass",
+        "randomize_rigid_body_mass",
+        "reset",
+        {"asset_cfg": {"body_names": "base"}, "mass_distribution_params": [1.0, 1.0], "operation": "add"},
+    )
+    EventSet([ev]).apply_reset(model, data, robot_map, np.random.default_rng(0))
+    np.testing.assert_array_equal(data.qpos, before)
+    bid = robot_map.body_ids["base"][0]
+    assert model.body_subtreemass[bid] == pytest.approx(robot_map.default_body_mass[bid : bid + 3].sum() + 1.0)
+
+
+@pytest.mark.parametrize("func", ["randomize_actuator_gains", "randomize_joint_parameters"])
+def test_actuator_randomization_is_strict_only(func):
+    model, data, robot_map = make_model_and_map()
+    ev = event(func, func, "startup", {"asset_cfg": {"joint_names": [".*"]}})
+    events = EventSet([ev], strict=True)
+    before = (model.dof_damping.copy(), model.dof_frictionloss.copy(), model.dof_armature.copy())
+    events.apply_startup(model, data, robot_map, np.random.default_rng(0))
+    for a, b in zip(before, (model.dof_damping, model.dof_frictionloss, model.dof_armature)):
+        np.testing.assert_array_equal(a, b)
+    with pytest.raises(NotImplementedError, match="strict mode"):
+        EventSet([ev])

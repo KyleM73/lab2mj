@@ -213,6 +213,16 @@ def _sample_distribution(rng: np.random.Generator, params: tuple[float, float], 
     raise ValueError(f"unknown distribution '{distribution}' (use 'uniform', 'log_uniform', 'gaussian')")
 
 
+def _refresh_model_constants(model: mujoco.MjModel) -> None:
+    """Refresh mass/inertia-derived model constants after a mass / CoM event.
+
+    ``mj_setConst`` evaluates the model at ``qpos0`` and leaves that configuration in the
+    MjData it is given, so it runs on scratch data: on the live data it would teleport
+    the robot to ``qpos0`` (the env origin) mid-episode.
+    """
+    mujoco.mj_setConst(model, mujoco.MjData(model))
+
+
 def write_root_state(
     model: mujoco.MjModel,
     data: mujoco.MjData,
@@ -267,6 +277,10 @@ class EventSet:
         "push_by_setting_velocity",
         "apply_external_force_torque",
     )
+    # Actuator-level randomization (PD gains held by the runtime env, joint friction / armature
+    # split across the stiction switch and the implicit-PD damping) is not ported: accepted
+    # only in strict mode, where no event applies.
+    _STRICT_ONLY_FUNCS = ("randomize_actuator_gains", "randomize_joint_parameters")
     _MODEL_CONST_FUNCS = ("randomize_rigid_body_mass", "randomize_rigid_body_com")
     _KNOWN_MODES = ("startup", "reset", "interval")
 
@@ -283,8 +297,18 @@ class EventSet:
         has_material_event = False
         for event in events:
             func = class_name(event.func)
+            if func in self._STRICT_ONLY_FUNCS:
+                if not strict:
+                    raise NotImplementedError(
+                        f"event '{event.name}' ({event.func}) is not ported to the MuJoCo runtime; "
+                        "it is only accepted in strict mode, where events do not apply"
+                    )
+                continue
             if func not in self._KNOWN_FUNCS:
-                raise ValueError(f"unsupported event func '{event.func}' (known: {list(self._KNOWN_FUNCS)})")
+                raise ValueError(
+                    f"unsupported event func '{event.func}' "
+                    f"(known: {list(self._KNOWN_FUNCS)}; strict-only: {list(self._STRICT_ONLY_FUNCS)})"
+                )
             if event.mode not in self._KNOWN_MODES:
                 raise ValueError(
                     f"event '{event.name}' has unsupported mode '{event.mode}' (known: {list(self._KNOWN_MODES)}); "
@@ -314,13 +338,13 @@ class EventSet:
                         UserWarning,
                         stacklevel=2,
                     )
-        self._events = list(events)
+        self._events = [e for e in events if class_name(e.func) not in self._STRICT_ONLY_FUNCS]
         self._terrain_static_friction = float(terrain_static_friction)
         self._friction_combine_mode = str(friction_combine_mode)
         if has_material_event:
             pair_friction(1.0, 1.0, self._friction_combine_mode)  # validate the mode eagerly
         self._strict = bool(strict)
-        self._interval_events = [e for e in events if e.mode == "interval"]
+        self._interval_events = [e for e in self._events if e.mode == "interval"]
         self._interval_time_left: list[float | None] = [None] * len(self._interval_events)
         # IsaacLab samples the material buckets ONCE at term init and only draws bucket
         # *indices* per application. With a construction rng the buckets are fixed here;
@@ -384,7 +408,7 @@ class EventSet:
                 touched_model |= class_name(event.func) in self._MODEL_CONST_FUNCS
             self._interval_time_left[i] = time_left
         if touched_model:
-            mujoco.mj_setConst(model, data)  # refresh mass/inertia-derived model constants
+            _refresh_model_constants(model)
         return applied
 
     # -- internals ------------------------------------------------------------------
@@ -399,7 +423,7 @@ class EventSet:
             self._apply_event(event, model, data, robot_map, rng)
             touched_model |= class_name(event.func) in self._MODEL_CONST_FUNCS
         if touched_model:
-            mujoco.mj_setConst(model, data)  # refresh mass/inertia-derived model constants
+            _refresh_model_constants(model)
 
     def _apply_event(
         self, event: EventIR, model: mujoco.MjModel, data: mujoco.MjData, robot_map: RobotMap, rng: np.random.Generator
