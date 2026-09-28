@@ -40,6 +40,13 @@ the model's friction bound, applied before every MuJoCo step:
   static/dynamic bounds and re-create the late-breakaway grind). It becomes
   capturable again once it leaves the window or comes to rest.
 
+Friction rows of EVERY robot joint (not only the stiction joints) carry the near-hard
+impedance below: MuJoCo's default friction-row regularization makes ``frictionloss`` a
+velocity-ramped soft Coulomb (measured on a G1 walking rollout with 1.2-2.4 N*m dynamic
+friction: 20-40 % of the bound below 0.05 rad/s, 78 % at 0.2-0.5 rad/s, 92 % at 1-2 rad/s),
+while PhysX bounds a moving joint's friction constraint at the full dynamic effort. Hardened,
+the applied friction is >= 95 % of the bound above 0.02 rad/s.
+
 ``M_jj`` is the diagonal of the joint-space inertia (armature included) —
 exact for leaf joints, an approximation of the articulated stopping impulse
 elsewhere, where it only shifts the capture instant by O(one step). The
@@ -62,6 +69,22 @@ __all__ = ["JointStiction"]
 # within a fraction of a millisecond for any saturation excess above ~1 % of
 # the static effort.
 SLIP_EPS = 1.0e-5
+
+
+def _harden_friction_rows(model: mujoco.MjModel, dof_adr: np.ndarray) -> None:
+    """Near-hard impedance on the friction rows of ``dof_adr`` (see module docstring).
+
+    PhysX holds a captured joint at qd == 0 exactly (float32 noise) and applies the full
+    dynamic effort to a moving joint; MuJoCo's DEFAULT friction-row regularization lets a
+    loaded stuck joint creep at ~mrad/s, which mis-times the breakaway (measured: a 5 mrad
+    creep shifted fl_kn's release by 50 ms and cost 0.5 rad downstream), and ramps the
+    moving friction with speed. The stiffest stable reference removes both. Rows exist only
+    for joints with nonzero ``frictionloss``, so frictionless joints are unaffected.
+    """
+    model.dof_solimp[dof_adr, 0] = 0.9999
+    model.dof_solimp[dof_adr, 1] = 0.9999
+    model.dof_solref[dof_adr, 0] = 2.0 * model.opt.timestep
+    model.dof_solref[dof_adr, 1] = 1.0
 
 
 class JointStiction:
@@ -90,6 +113,7 @@ class JointStiction:
         dof_adr = np.asarray(dof_adr, dtype=np.intp)
         if not (static.shape == dynamic.shape == dof_adr.shape):
             raise ValueError(f"shape mismatch: static {static.shape}, dynamic {dynamic.shape}, dofs {dof_adr.shape}")
+        _harden_friction_rows(model, dof_adr)
         mask = static > dynamic
         self.dof_adr = dof_adr[mask]
         self.static = static[mask]
@@ -110,15 +134,6 @@ class JointStiction:
                 self._m_diag_adr = model.M_rowadr[self.dof_adr] + model.M_rownnz[self.dof_adr] - 1
             else:
                 self._m_diag_adr = model.dof_Madr[self.dof_adr]
-            # PhysX holds a captured joint at qd == 0 exactly (float32 noise); MuJoCo's
-            # DEFAULT friction-row regularization lets a loaded stuck joint creep at
-            # ~mrad/s, which mis-times the breakaway (measured: a 5 mrad creep shifted
-            # fl_kn's release by 50 ms and cost 0.5 rad downstream). Near-hard impedance
-            # at the stiffest stable reference removes the creep.
-            model.dof_solimp[self.dof_adr, 0] = 0.9999
-            model.dof_solimp[self.dof_adr, 1] = 0.9999
-            model.dof_solref[self.dof_adr, 0] = 2.0 * model.opt.timestep
-            model.dof_solref[self.dof_adr, 1] = 1.0
         self._static_dt = self.static * self.physics_dt
         self._stuck = np.zeros(self.dof_adr.shape, dtype=bool)
         self._held = np.zeros(self.dof_adr.shape, dtype=bool)

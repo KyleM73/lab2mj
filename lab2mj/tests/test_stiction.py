@@ -162,3 +162,40 @@ class TestCaptureHoldRelease:
         self._run(model, data, stiction, 200)
         stiction.reset()
         assert not stiction._stuck.any()
+
+
+HINGE_XML = """
+<mujoco>
+  <option timestep="0.000625" gravity="0 0 0"/>
+  <worldbody>
+    <body name="link">
+      <joint name="hinge" type="hinge" axis="0 0 1" frictionloss="1.0"/>
+      <geom type="capsule" fromto="0 0 0 0.3 0 0" size="0.03" mass="1.0"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def _coasting_friction_fraction(harden: bool) -> float:
+    """Mean friction force / bound while a hinge coasts from 0.5 rad/s with no drive (above 0.05 rad/s)."""
+    model = mujoco.MjModel.from_xml_string(HINGE_XML)
+    data = mujoco.MjData(model)
+    if harden:  # a Coulomb-only joint (static == dynamic): no stiction switch, hardened rows only
+        stiction = JointStiction(model, np.array([0]), np.array([1.0]), np.array([1.0]), physics_dt=0.005)
+        assert not stiction.active
+    data.qvel[0] = 0.5
+    fractions = []
+    while data.qvel[0] > 0.05:
+        mujoco.mj_step(model, data)
+        rows = data.efc_type == mujoco.mjtConstraint.mjCNSTR_FRICTION_DOF
+        fractions.append(-float(data.efc_force[rows].sum()) / 1.0)
+    return float(np.mean(fractions))
+
+
+def test_friction_rows_are_hardened_for_coulomb_joints():
+    # With MuJoCo's default friction-row regularization a coasting joint feels a
+    # velocity-ramped fraction of its Coulomb bound (~0.6 here); PhysX applies the full
+    # dynamic effort to a moving joint, which the hardened rows reproduce.
+    assert _coasting_friction_fraction(harden=False) < 0.8
+    assert _coasting_friction_fraction(harden=True) == pytest.approx(1.0, abs=1e-3)
