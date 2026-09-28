@@ -46,6 +46,8 @@ _ACTUATOR_MODELS: dict[str, ActuatorModel] = {
     "ActuatorNetMLP": "actuator_net_mlp",
 }
 
+_CONTACT_SENSOR_CLASSES = {"ContactSensor", "SyncFreeContactSensor"}
+
 _OBS_GROUP_META_KEYS = {
     "concatenate_terms",
     "concatenate_dim",
@@ -369,7 +371,7 @@ def _parse_contact_sensors(scene: dict[str, Any]) -> list[ContactSensorIR]:
     for name, entry in scene.items():
         if not isinstance(entry, dict) or not isinstance(entry.get("class_type"), str):
             continue
-        if class_name(entry["class_type"]) != "ContactSensor":
+        if class_name(entry["class_type"]) not in _CONTACT_SENSOR_CLASSES:
             continue
         sensors.append(
             ContactSensorIR(

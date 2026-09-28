@@ -140,6 +140,12 @@ class TestSpotInitAndScene:
         assert sensor.force_threshold == 1.0
         assert sensor.update_period == 0.005
 
+    def test_sync_free_contact_sensor(self):
+        data = load_env_yaml(SPOT_ENV_YAML)
+        data["scene"]["contact_forces"]["class_type"] = "contact_lab.sensors:SyncFreeContactSensor"
+        (sensor,) = parse_env_dict(data).contact_sensors
+        assert sensor.name == "contact_forces" and sensor.history_length == 4
+
 
 class TestSpotCommands:
     def test_base_velocity(self, spot_ir: EnvIR):
