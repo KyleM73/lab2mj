@@ -35,9 +35,8 @@ Semantics notes vs Isaac/PhysX:
 * ``randomize_joint_default_pos`` (contact_lab encoder calibration bias): offsets the default
   joint positions in place; the runtime shifts the joint-position action offset by
   :attr:`EventSet.joint_default_pos_offset` after the startup events, as the Isaac term does.
-* contact_lab's ``check_joint_friction`` (an Isaac-side config check) and
-  ``set_legacy_joint_friction`` (PhysX's legacy joint friction, realized at conversion by
-  ``lab2mj.convert --legacy_friction``) are accepted and do nothing at runtime.
+* contact_lab's ``check_joint_friction`` (an Isaac-side config check) is accepted and does
+  nothing at runtime.
 * All events no-op in strict mode.
 
 ``RobotMap`` is the runtime-provided addressing/default-state bundle documented on the
@@ -284,10 +283,9 @@ class EventSet:
         "apply_external_force_torque",
         "randomize_joint_default_pos",
         "check_joint_friction",
-        "set_legacy_joint_friction",
     )
     # Accepted without a runtime effect (see the module docstring).
-    _NOOP_FUNCS = ("check_joint_friction", "set_legacy_joint_friction")
+    _NOOP_FUNCS = ("check_joint_friction",)
     # Actuator-level randomization (PD gains held by the runtime env, joint friction / armature
     # split across the stiction switch and the implicit-PD damping) is not ported: accepted
     # only in strict mode, where no event applies.

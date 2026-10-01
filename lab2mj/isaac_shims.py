@@ -24,6 +24,9 @@ a dumped yaml:
   introspection) and nothing else; if one is ever serialized it stringifies to its
   ``omni.``/``carb.``/``isaacsim.`` qualified name, which a structural comparison
   against a real dump immediately exposes.
+* Isaac Lab add-on packages that the config layer imports but a config-only install
+  lacks (:data:`_OPTIONAL_PACKAGES`; Isaac Lab 2.3.2's ``isaaclab.scene`` imports
+  ``isaaclab_contrib``) are stubbed the same way, only when they are not installed.
 * :func:`install` refuses to run when the real runtime is present or when
   ``isaaclab`` modules that bake settings values into module constants were
   already imported without the shims.
@@ -36,10 +39,13 @@ from __future__ import annotations
 
 import importlib.abc
 import importlib.machinery
+import importlib.util
 import sys
 import types
 
 _SHIMMED_NAMESPACES = ("carb", "omni", "isaacsim")
+# Isaac Lab packages imported by the config layer that config-only installs may lack.
+_OPTIONAL_PACKAGES = ("isaaclab_contrib",)
 
 # isaaclab modules that read carb.settings at module scope and bake the result into
 # module-level constants. They must not be imported before the shims are installed.
@@ -153,8 +159,11 @@ class _ShimLoader(importlib.abc.Loader):
 
 
 class _ShimFinder(importlib.abc.MetaPathFinder):
+    def __init__(self, namespaces: tuple[str, ...]) -> None:
+        self.namespaces = namespaces
+
     def find_spec(self, fullname: str, path=None, target=None):
-        if fullname.split(".")[0] in _SHIMMED_NAMESPACES:
+        if fullname.split(".")[0] in self.namespaces:
             return importlib.machinery.ModuleSpec(fullname, _ShimLoader(), is_package=True)
         return None
 
@@ -184,7 +193,8 @@ def install() -> None:
         if mod_name in sys.modules:
             raise RuntimeError(f"{mod_name!r} was imported before isaac_shims.install(); its constants are untrusted")
 
-    sys.meta_path.insert(0, _ShimFinder())
+    missing = tuple(pkg for pkg in _OPTIONAL_PACKAGES if importlib.util.find_spec(pkg) is None)
+    sys.meta_path.insert(0, _ShimFinder(_SHIMMED_NAMESPACES + missing))
 
     # carb.settings.get_settings() must hand out the strict settings object even when
     # callers only ``import carb`` — create both modules eagerly and link them.

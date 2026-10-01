@@ -42,7 +42,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
-import re
 import shutil
 import sys
 import urllib.parse
@@ -537,57 +536,15 @@ def _resolve_obs_layouts(
     return policy_obs_dim
 
 
-def parse_legacy_friction(spec: str) -> dict[str, tuple[float, float, float]]:
-    """Parse ``"regex=static,dynamic,viscous;regex=..."`` (N*m, N*m, N*m*s/rad) into a dict."""
-    out: dict[str, tuple[float, float, float]] = {}
-    for item in filter(None, (part.strip() for part in spec.split(";"))):
-        pattern, sep, values = item.rpartition("=")
-        numbers = [float(v) for v in values.split(",")]
-        if not sep or len(numbers) != 3:
-            raise ValueError(f"--legacy_friction entry '{item}' must read 'regex=static,dynamic,viscous'")
-        out[pattern] = (numbers[0], numbers[1], numbers[2])
-    return out
-
-
-def apply_legacy_friction(
-    ir: EnvIR, equivalents: dict[str, tuple[float, float, float]] | None, isaac_joint_order: list[str]
-) -> dict[str, Any] | None:
-    """Realize contact_lab's ``set_legacy_joint_friction`` event as fixed joint friction.
-
-    PhysX's legacy friction coefficient bounds a joint's friction by a load-dependent
-    wrench norm, which MuJoCo has no counterpart for. ``equivalents`` gives fixed
-    (static, dynamic, viscous) efforts per joint-name regex — the event's own keys —
-    and is written into the actuator groups (mutating ``ir``), so the converter's
-    regular friction path (``dof_frictionloss``, damping, stiction) carries it.
-    Returns the manifest record, or None when the env has no such event.
-    """
-    events = [e for e in ir.events if class_name(e.func) == "set_legacy_joint_friction"]
-    if not events:
-        if equivalents:
-            raise ValueError("--legacy_friction given, but the env has no set_legacy_joint_friction event")
-        return None
-    coefficients: dict[str, float] = {}
-    for event in events:
-        coefficients.update({str(k): float(v) for k, v in event.params["coefficients"].items()})
-    if equivalents is None:
-        raise ValueError(
-            f"the env applies PhysX's legacy joint friction {coefficients} (set_legacy_joint_friction), which "
-            "MuJoCo cannot reproduce; pass --legacy_friction 'regex=static,dynamic,viscous;...' with fixed "
-            "N*m equivalents for the same regex keys"
-        )
-    if set(equivalents) != set(coefficients):
-        raise ValueError(f"--legacy_friction keys {sorted(equivalents)} must equal the event's {sorted(coefficients)}")
-    for group in ir.actuators:
-        names = [isaac_joint_order[i] for i in resolve_matching_names(group.joint_names_expr, isaac_joint_order)]
-        patterns = {p: v for p, v in equivalents.items() if any(re.fullmatch(p, n) for n in names)}
-        if not patterns:
-            continue
-        if any(getattr(group, f) not in (None, 0, 0.0) for f in ("friction", "dynamic_friction", "viscous_friction")):
-            raise ValueError(f"actuator group '{group.name}': legacy-friction joints must carry no actuator friction")
-        group.friction = {p: v[0] for p, v in patterns.items()}
-        group.dynamic_friction = {p: v[1] for p, v in patterns.items()}
-        group.viscous_friction = {p: v[2] for p, v in patterns.items()}
-    return {"coefficients": coefficients, "equivalents": {p: list(v) for p, v in equivalents.items()}}
+def reject_legacy_friction(ir: EnvIR) -> None:
+    """Raise for contact_lab's ``set_legacy_joint_friction``: PhysX's legacy joint friction bounds a joint's
+    friction by a load-dependent wrench norm, which MuJoCo has no counterpart for."""
+    for event in ir.events:
+        if class_name(event.func) == "set_legacy_joint_friction":
+            raise ValueError(
+                f"event '{event.name}' applies PhysX's legacy (load-scaled) joint friction, which the converter "
+                "cannot reproduce in MuJoCo"
+            )
 
 
 def convert_run(
@@ -606,12 +563,8 @@ def convert_run(
     terrain_collision_res: float | str | None = "auto",
     terrain_fine_margin: float = MEASURED_FINE_MARGIN_M,
     terrain_fine_full: bool = False,
-    legacy_friction: dict[str, tuple[float, float, float]] | None = None,
 ) -> Path:
     """Convert an IsaacLab run into a MuJoCo bundle; returns the bundle directory.
-
-    ``legacy_friction``: fixed (static, dynamic, viscous) joint friction per regex for an
-    env that applies PhysX's legacy friction model (:func:`apply_legacy_friction`).
 
     ``substeps`` MuJoCo steps integrate each Isaac physics step (model timestep
     and default contact solref author against the substep dt); ``None`` resolves
@@ -689,7 +642,7 @@ def convert_run(
             "body frame differ from the Isaac root link frame that dumps, resets, and body-frame "
             "observations assume — re-export the robot USD with upAxis Z to convert it for sim2sim"
         )
-    legacy_friction_record = apply_legacy_friction(ir, legacy_friction, robot.isaac_joint_order)
+    reject_legacy_friction(ir)
     actuator_set = ActuatorSet.from_ir(ir.actuators, robot.isaac_joint_order)
     joint_overrides = actuator_set.builder_overrides()
     # USD-authored joint armature is the PhysX default whenever the actuator cfg
@@ -954,7 +907,6 @@ def convert_run(
             "physics_material": ir.sim_physics_material,
             "robot_physics_material": ir.robot_physics_material,
             "contact_profile": resolved_contact_profile,
-            "legacy_friction": legacy_friction_record,
             "contact_solimp": None if contact_solimp is None else [float(v) for v in contact_solimp],
             "contact_impratio": contact_impratio,
             "contact_solref": None if contact_solref is None else [float(v) for v in contact_solref],
@@ -1204,13 +1156,6 @@ def main(argv: list[str] | None = None) -> int:
         help="Author the fine measured-collision grid over the full terrain extent instead of a window "
         "around the dump trajectory (subject to the node budget).",
     )
-    parser.add_argument(
-        "--legacy_friction",
-        default=None,
-        help="Fixed joint friction for an env using PhysX's legacy friction model (contact_lab's "
-        "set_legacy_joint_friction): 'regex=static,dynamic,viscous;...' in N*m, N*m, N*m*s/rad, keyed "
-        "like the event's coefficients.",
-    )
     args = parser.parse_args(argv)
     collision_res: str | float = args.terrain_collision_res
     if collision_res not in ("auto", "record"):
@@ -1236,7 +1181,6 @@ def main(argv: list[str] | None = None) -> int:
         terrain_collision_res=collision_res,
         terrain_fine_margin=args.terrain_fine_margin,
         terrain_fine_full=args.terrain_fine_full,
-        legacy_friction=None if args.legacy_friction is None else parse_legacy_friction(args.legacy_friction),
     )
     return 0
 

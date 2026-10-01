@@ -623,14 +623,9 @@ def test_actuator_randomization_is_strict_only(func):
         EventSet([ev])
 
 
-def test_contact_lab_friction_events_are_runtime_noops():
+def test_check_joint_friction_is_a_runtime_noop():
     model, data, robot_map = make_model_and_map()
-    events = EventSet(
-        [
-            event("check", "check_joint_friction", "startup", {}),
-            event("legacy", "set_legacy_joint_friction", "startup", {"coefficients": {"j.*": 0.18}}),
-        ]
-    )
+    events = EventSet([event("check", "check_joint_friction", "startup", {})])
     qpos = data.qpos.copy()
     events.apply_startup(model, data, robot_map, np.random.default_rng(0))
     np.testing.assert_array_equal(data.qpos, qpos)
