@@ -41,6 +41,7 @@ _ACTUATOR_MODELS: dict[str, ActuatorModel] = {
     "RemotizedPDActuator": "remotized_pd",
     "SyncFreeDelayedPDActuator": "delayed_pd",
     "SyncFreeRemotizedPDActuator": "remotized_pd",
+    "TorqueSpeedRemotizedPDActuator": "remotized_pd",
     "DCMotor": "dc_motor",
     "ActuatorNetLSTM": "actuator_net_lstm",
     "ActuatorNetMLP": "actuator_net_mlp",
@@ -232,6 +233,20 @@ def _parse_pre_trained_policy_action(term: dict[str, Any]) -> ActionIR:
     )
 
 
+_TORQUE_SPEED_KEYS = ("max_torque", "min_torque", "max_speed", "min_speed", "max_flat_speed", "min_flat_speed")
+
+
+def _parse_torque_speed_envelope(name: str, actuator: dict[str, Any]) -> list[float] | None:
+    """The six torque-speed envelope fields of contact_lab's TorqueSpeedRemotizedPDActuatorCfg, else None."""
+    present = [key for key in _TORQUE_SPEED_KEYS if actuator.get(key) is not None]
+    if not present:
+        return None
+    if len(present) != len(_TORQUE_SPEED_KEYS):
+        missing = [key for key in _TORQUE_SPEED_KEYS if key not in present]
+        raise ValueError(f"actuator '{name}': torque-speed envelope is missing {missing}")
+    return [float(actuator[key]) for key in _TORQUE_SPEED_KEYS]
+
+
 def _parse_actuators(cfg: dict[str, Any] | None) -> list[ActuatorGroupIR]:
     groups = []
     for name, actuator in (cfg or {}).items():
@@ -254,6 +269,7 @@ def _parse_actuators(cfg: dict[str, Any] | None) -> list[ActuatorGroupIR]:
                 min_delay=actuator.get("min_delay"),
                 max_delay=actuator.get("max_delay"),
                 joint_parameter_lookup=None if lut is None else np.asarray(lut, dtype=np.float64),
+                torque_speed_envelope=_parse_torque_speed_envelope(name, actuator),
                 saturation_effort=_plain(actuator.get("saturation_effort")),
                 network_file=actuator.get("network_file"),
                 pos_scale=None if actuator.get("pos_scale") is None else float(actuator["pos_scale"]),

@@ -346,3 +346,43 @@ class TestContactOverrides:
         manifest = read_manifest(out)
         assert manifest["sim"]["contact_impratio"] == pytest.approx(5.0)
         assert manifest["sim"]["contact_solimp"] == pytest.approx(list(solimp))
+
+
+class TestLegacyFriction:
+    JOINTS = ["fl_hx", "fl_hy", "fl_kn"]
+
+    def _ir(self):
+        from lab2mj.ir import EventIR
+
+        raw = load_env_yaml(FIXTURES / "spot_velocity_env.yaml")
+        ir = parse_env_dict(raw)
+        for group in ir.actuators:
+            group.friction = group.dynamic_friction = group.viscous_friction = None
+        coefficients = {".*_h[xy]": 0.008, ".*_kn": 0.18}
+        ir.events.append(
+            EventIR(
+                name="legacy", func="m:set_legacy_joint_friction", mode="startup", params={"coefficients": coefficients}
+            )
+        )
+        return ir
+
+    def test_writes_fixed_friction_into_the_groups(self):
+        from lab2mj.actuators import ActuatorSet
+        from lab2mj.convert import apply_legacy_friction, parse_legacy_friction
+
+        ir = self._ir()
+        equivalents = parse_legacy_friction(".*_h[xy]=0.1,0.1,0.0; .*_kn=1.5,1.0,0.5")
+        record = apply_legacy_friction(ir, equivalents, self.JOINTS)
+        assert record is not None and record["coefficients"] == {".*_h[xy]": 0.008, ".*_kn": 0.18}
+        aset = ActuatorSet.from_ir(ir.actuators, self.JOINTS)
+        np.testing.assert_allclose(aset.static_friction, [0.1, 0.1, 1.5])
+        np.testing.assert_allclose(aset.dynamic_friction, [0.1, 0.1, 1.0])
+        np.testing.assert_allclose(aset.viscous_friction, [0.0, 0.0, 0.5])
+
+    def test_requires_matching_equivalents(self):
+        from lab2mj.convert import apply_legacy_friction
+
+        with pytest.raises(ValueError, match="--legacy_friction"):
+            apply_legacy_friction(self._ir(), None, self.JOINTS)
+        with pytest.raises(ValueError, match="must equal"):
+            apply_legacy_friction(self._ir(), {".*_kn": (1.5, 1.0, 0.5)}, self.JOINTS)

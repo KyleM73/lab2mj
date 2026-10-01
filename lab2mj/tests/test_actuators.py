@@ -501,3 +501,35 @@ class TestContactProfileSelection:
 
     def test_spot_fixture_keeps_default(self):
         assert _spot_actuator_set().contact_profile() == "default"
+
+
+class TestTorqueSpeedEnvelope:
+    ENVELOPE = np.array([97.0, -108.79, 25.03, -22.22, 9.48, -8.32])
+
+    def test_clip_corners(self):
+        from lab2mj.actuators import torque_speed_envelope_clip
+
+        vel = np.array([-30.0, 0.0, 9.48, 17.255, 25.03, 30.0])
+        np.testing.assert_allclose(
+            torque_speed_envelope_clip(np.full(6, 200.0), vel, self.ENVELOPE), [97.0, 97.0, 97.0, 48.5, 0.0, 0.0]
+        )
+        vel = np.array([30.0, 0.0, -8.32, -15.27, -22.22, -30.0])
+        np.testing.assert_allclose(
+            torque_speed_envelope_clip(np.full(6, -200.0), vel, self.ENVELOPE),
+            [-108.79, -108.79, -108.79, -54.395, 0.0, 0.0],
+        )
+
+    def test_applied_after_the_lookup(self):
+        group = ActuatorGroupIR(
+            name="knee",
+            joint_names_expr=["a"],
+            model="remotized_pd",
+            stiffness=1000.0,
+            damping=0.0,
+            joint_parameter_lookup=np.array([[-1.0, 1.0, 50.0], [1.0, 1.0, 150.0]]),
+            torque_speed_envelope=list(self.ENVELOPE),
+        )
+        aset = ActuatorSet.from_ir([group], ["a"])
+        # lookup cap 100 at q=0; the envelope caps 97 at rest and 48.5 at 17.255 rad/s
+        assert aset.compute_torques(np.zeros(1), np.zeros(1), np.ones(1))[0] == pytest.approx(97.0)
+        assert aset.compute_torques(np.zeros(1), np.full(1, 17.255), np.ones(1))[0] == pytest.approx(48.5)

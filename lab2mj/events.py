@@ -32,6 +32,12 @@ Semantics notes vs Isaac/PhysX:
 * Root velocities follow Isaac's ``write_root_velocity_to_sim``: the sampled 6-vector is
   the root **CoM** velocity in world frame. The MuJoCo free joint stores
   ``[lin vel of body-frame origin (world), ang vel (body frame)]``, so we convert.
+* ``randomize_joint_default_pos`` (contact_lab encoder calibration bias): offsets the default
+  joint positions in place; the runtime shifts the joint-position action offset by
+  :attr:`EventSet.joint_default_pos_offset` after the startup events, as the Isaac term does.
+* contact_lab's ``check_joint_friction`` (an Isaac-side config check) and
+  ``set_legacy_joint_friction`` (PhysX's legacy joint friction, realized at conversion by
+  ``lab2mj.convert --legacy_friction``) are accepted and do nothing at runtime.
 * All events no-op in strict mode.
 
 ``RobotMap`` is the runtime-provided addressing/default-state bundle documented on the
@@ -276,7 +282,12 @@ class EventSet:
         "reset_joints_around_default",
         "push_by_setting_velocity",
         "apply_external_force_torque",
+        "randomize_joint_default_pos",
+        "check_joint_friction",
+        "set_legacy_joint_friction",
     )
+    # Accepted without a runtime effect (see the module docstring).
+    _NOOP_FUNCS = ("check_joint_friction", "set_legacy_joint_friction")
     # Actuator-level randomization (PD gains held by the runtime env, joint friction / armature
     # split across the stiction switch and the implicit-PD damping) is not ported: accepted
     # only in strict mode, where no event applies.
@@ -338,7 +349,9 @@ class EventSet:
                         UserWarning,
                         stacklevel=2,
                     )
-        self._events = [e for e in events if class_name(e.func) not in self._STRICT_ONLY_FUNCS]
+        self._events = [e for e in events if class_name(e.func) not in self._STRICT_ONLY_FUNCS + self._NOOP_FUNCS]
+        self.joint_default_pos_offset: np.ndarray | None = None
+        """Accumulated ``randomize_joint_default_pos`` offset (J,), Isaac order; None if never applied."""
         self._terrain_static_friction = float(terrain_static_friction)
         self._friction_combine_mode = str(friction_combine_mode)
         if has_material_event:
@@ -558,6 +571,18 @@ class EventSet:
         joint_vel = np.clip(joint_vel, -vel_limits, vel_limits)
         data.qpos[robot_map.qpos_adr[joint_idx]] = joint_pos
         data.qvel[robot_map.dof_adr[joint_idx]] = joint_vel
+
+    def _randomize_joint_default_pos(
+        self, model: mujoco.MjModel, data: mujoco.MjData, robot_map: RobotMap, rng: np.random.Generator, params: dict
+    ) -> None:
+        joint_idx = _matched_joint_indices(params, robot_map)
+        lo, hi = params["offset_range"]
+        offset = np.zeros(len(robot_map.default_joint_pos), dtype=np.float64)
+        offset[joint_idx] = rng.uniform(lo, hi, len(joint_idx))
+        robot_map.default_joint_pos += offset
+        self.joint_default_pos_offset = (
+            offset if self.joint_default_pos_offset is None else self.joint_default_pos_offset + offset
+        )
 
     def _reset_joints_around_default(
         self, model: mujoco.MjModel, data: mujoco.MjData, robot_map: RobotMap, rng: np.random.Generator, params: dict

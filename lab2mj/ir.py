@@ -121,6 +121,9 @@ class ActuatorGroupIR(_IRBase):
     max_delay: int | None = None
     # (angle, transmission ratio, max torque) rows for remotized_pd.
     joint_parameter_lookup: np.ndarray | None = None
+    # Optional remotized_pd torque-speed envelope (contact_lab TorqueSpeedRemotizedPDActuator):
+    # (max_torque, min_torque, max_speed, min_speed, max_flat_speed, min_flat_speed).
+    torque_speed_envelope: list[float] | None = None
     # Stall torque of the DCMotor torque-speed curve (dc_motor / actuator nets).
     saturation_effort: ScalarOrRegexDict = None
     # Source of the actuator-net weights as recorded in env.yaml (URL or path).
@@ -155,6 +158,9 @@ class ActuatorGroupIR(_IRBase):
             min_delay=data.get("min_delay"),
             max_delay=data.get("max_delay"),
             joint_parameter_lookup=None if lut is None else np.asarray(lut, dtype=np.float64),
+            torque_speed_envelope=None
+            if data.get("torque_speed_envelope") is None
+            else [float(v) for v in data["torque_speed_envelope"]],
             saturation_effort=data.get("saturation_effort"),
             network_file=data.get("network_file"),
             network_bundle_path=data.get("network_bundle_path"),

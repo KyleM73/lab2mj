@@ -16,7 +16,9 @@ computes torques exactly as IsaacLab v2.3.0 does on the GPU side:
   instead the torque is clamped to an angle-dependent envelope linearly
   interpolated from ``joint_parameter_lookup`` columns (angle, ratio,
   max_torque), with zero-order hold outside the table range (``np.interp``
-  matches IsaacLab's ``LinearInterpolation`` exactly).
+  matches IsaacLab's ``LinearInterpolation`` exactly). contact_lab's
+  ``TorqueSpeedRemotizedPDActuator`` adds a torque-speed envelope on top
+  (:func:`torque_speed_envelope_clip`).
 - ``dc_motor``: same PD law, clipped to the linear four-quadrant DC-motor
   torque-speed curve instead of the plain box (:func:`dc_motor_clip`, an exact
   mirror of ``DCMotor._clip_effort``).
@@ -124,6 +126,19 @@ def dc_motor_clip(
     return np.clip(effort, min_effort, max_effort)
 
 
+def torque_speed_envelope_clip(tau: np.ndarray, vel: np.ndarray, envelope: np.ndarray) -> np.ndarray:
+    """Clip torque to contact_lab's ``TorqueSpeedRemotizedPDActuator`` envelope.
+
+    ``envelope`` is ``(max_torque, min_torque, max_speed, min_speed, max_flat_speed, min_flat_speed)``:
+    the forward cap is ``max_torque`` up to ``max_flat_speed`` and falls linearly to zero at
+    ``max_speed``; the backward cap mirrors it with the ``min_*`` values.
+    """
+    max_torque, min_torque, max_speed, min_speed, max_flat, min_flat = envelope
+    upper = max_torque * np.clip((max_speed - vel) / (max_speed - max_flat), 0.0, 1.0)
+    lower = min_torque * np.clip((vel - min_speed) / (min_flat - min_speed), 0.0, 1.0)
+    return np.clip(tau, lower, upper)
+
+
 def resolve_matching_names(patterns: list[str], names: list[str], what: str = "patterns") -> list[int]:
     """Match regex patterns against ``names``; mirror of isaaclab ``resolve_matching_names``.
 
@@ -220,6 +235,8 @@ class ActuatorGroup:
     lag: int = 0
     lut_angle: np.ndarray | None = None
     lut_max_torque: np.ndarray | None = None
+    # remotized_pd torque-speed envelope (see :func:`torque_speed_envelope_clip`), or None.
+    torque_speed_envelope: np.ndarray | None = None
     # DCMotor torque-speed curve parameters (per joint), for models in _DC_MOTOR_MODELS.
     saturation_effort: np.ndarray | None = None
     dc_effort_limit: np.ndarray | None = None
@@ -536,6 +553,9 @@ class ActuatorSet:
 
             lut_angle: np.ndarray | None = None
             lut_max_torque: np.ndarray | None = None
+            envelope: np.ndarray | None = None
+            if group.torque_speed_envelope is not None and group.model != "remotized_pd":
+                raise ValueError(f"{what}: torque_speed_envelope is only supported on remotized_pd")
             if group.model == "remotized_pd":
                 if group.joint_parameter_lookup is None:
                     raise ValueError(f"{what}: remotized_pd requires joint_parameter_lookup")
@@ -546,6 +566,13 @@ class ActuatorSet:
                     raise ValueError(f"{what}: joint_parameter_lookup angles must be sorted ascending")
                 lut_angle = lut[:, 0].copy()
                 lut_max_torque = lut[:, 2].copy()
+                if group.torque_speed_envelope is not None:
+                    envelope = np.asarray(group.torque_speed_envelope, dtype=np.float64)
+                    if envelope.shape != (6,):
+                        raise ValueError(f"{what}: torque_speed_envelope needs 6 values, got {envelope.shape}")
+                    max_torque, min_torque, max_speed, min_speed, max_flat, min_flat = envelope
+                    if not (min_torque < 0.0 < max_torque and min_speed < min_flat <= 0.0 <= max_flat < max_speed):
+                        raise ValueError(f"{what}: invalid torque_speed_envelope {group.torque_speed_envelope}")
                 # RemotizedPDActuator forces the box effort/velocity limits to inf.
                 effort_group = np.full(len(ids), np.inf, dtype=np.float64)
             else:
@@ -695,6 +722,7 @@ class ActuatorSet:
                     max_delay=max_delay,
                     lut_angle=lut_angle,
                     lut_max_torque=lut_max_torque,
+                    torque_speed_envelope=envelope,
                     saturation_effort=saturation,
                     dc_effort_limit=dc_effort_limit,
                     dc_velocity_limit=dc_velocity_limit,
@@ -887,6 +915,8 @@ class ActuatorSet:
             elif group.lut_angle is not None and group.lut_max_torque is not None:
                 tau_max = np.interp(q[ids], group.lut_angle, group.lut_max_torque)
                 tau[ids] = np.clip(tau[ids], -tau_max, tau_max)
+                if group.torque_speed_envelope is not None:
+                    tau[ids] = torque_speed_envelope_clip(tau[ids], qd[ids], group.torque_speed_envelope)
         return tau
 
     def contact_profile(self) -> str:

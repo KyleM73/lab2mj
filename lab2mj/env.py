@@ -150,12 +150,14 @@ class ActionProcessor:
         offset: np.ndarray,
         clip: np.ndarray | None,
         default_joint_pos_isaac: np.ndarray,
+        use_default_offset: bool = False,
     ) -> None:
         self.joint_ids_isaac = np.asarray(joint_ids_isaac, dtype=np.intp)
         self.scale = np.asarray(scale, dtype=np.float64)
         self.offset = np.asarray(offset, dtype=np.float64)
         self.clip = None if clip is None else np.asarray(clip, dtype=np.float64)
         self.action_dim = int(self.joint_ids_isaac.shape[0])
+        self.use_default_offset = bool(use_default_offset)
         self._default_targets = np.asarray(default_joint_pos_isaac, dtype=np.float64).copy()
         if self._default_targets.shape != (num_joints,):
             raise ValueError(f"default_joint_pos_isaac must have shape ({num_joints},)")
@@ -174,7 +176,15 @@ class ActionProcessor:
             offset=np.asarray(action["offset"], dtype=np.float64),
             clip=None if action["clip"] is None else np.asarray(action["clip"], dtype=np.float64),
             default_joint_pos_isaac=default_joint_pos_isaac,
+            use_default_offset=bool((action.get("ir") or {}).get("use_default_offset", False)),
         )
+
+    def shift_default_joint_pos(self, offset_isaac: np.ndarray) -> None:
+        """Follow a default-joint-position offset (J,): held targets, and the action offset when it is the default."""
+        if not self.use_default_offset:
+            raise ValueError("a default-joint-position offset needs a joint action with use_default_offset")
+        self._default_targets += offset_isaac
+        self.offset = self.offset + offset_isaac[self.joint_ids_isaac]
 
     def processed(self, action_raw: np.ndarray) -> np.ndarray:
         """Processed action (A,): affine transform of the raw action, then clip."""
@@ -463,6 +473,12 @@ class PreTrainedPolicyRuntime:
         self._ll_last_raw = np.zeros(self.low_level_action.action_dim, dtype=np.float32)
         self._targets_isaac = default_joint_pos.copy()
         self._counter = 0
+
+    def shift_default_joint_pos(self, offset_isaac: np.ndarray) -> None:
+        """Follow a default-joint-position offset (J,) in the low-level action and held targets."""
+        self.low_level_action.shift_default_joint_pos(offset_isaac)
+        self._default_joint_pos = self._default_joint_pos + offset_isaac
+        self._targets_isaac = self._targets_isaac + offset_isaac
 
     def reset_cold(self) -> None:
         """Restore the just-constructed state (explicit resets only).
@@ -920,6 +936,8 @@ class MjEnv:
         self.data.qvel[:] = self._default_qvel
         if not self.strict and not self._startup_done:
             self._events.apply_startup(self.model, self.data, self.robot_map, self.rng)
+            if self._events.joint_default_pos_offset is not None:
+                self.action.shift_default_joint_pos(self._events.joint_default_pos_offset)
             self._startup_done = True
         if not self.strict:
             self._events.apply_reset(self.model, self.data, self.robot_map, self.rng)

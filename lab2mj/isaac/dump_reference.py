@@ -15,7 +15,9 @@ With ``--strict`` (default) the environment is made fully deterministic:
   default joint state) with no randomization. Merely removing every event
   term would NOT achieve this: spawning only applies the root transform, so
   without a reset term the joints would start at the USD-authored pose, which
-  need not match the articulation cfg's ``init_state``,
+  need not match the articulation cfg's ``init_state``. contact_lab's deterministic
+  plant terms (``set_legacy_joint_friction``, ``check_joint_friction``) are kept: they
+  define the simulated joint friction rather than randomize it,
 * the curriculum is disabled,
 * every command term's ranges are pinned to the single commanded value with
   ``resampling_time_range=(1e9, 1e9)`` and ``rel_standing_envs=0``. If a
@@ -290,6 +292,10 @@ def _pin_command_terms(commands_cfg: object, vel_cmd: list[float], pose_cmd: lis
             )
 
 
+# Deterministic startup terms that define the plant (contact_lab), kept in strict mode.
+_PLANT_EVENT_FUNCS = ("set_legacy_joint_friction", "check_joint_friction")
+
+
 def _apply_strict_overrides(env_cfg: Any, vel_cmd: list[float], pose_cmd: list[float] | None) -> None:
     """Make the env deterministic: no corruption, reset-to-default only, no curriculum, pinned commands."""
     for group_cfg in vars(env_cfg.observations).values():
@@ -309,7 +315,7 @@ def _apply_strict_overrides(env_cfg: Any, vel_cmd: list[float], pose_cmd: list[f
     # USD-authored joint pose instead of the documented default init state.
     if env_cfg.events is not None:
         for term_name, term_cfg in list(vars(env_cfg.events).items()):
-            if isinstance(term_cfg, EventTermCfg):
+            if isinstance(term_cfg, EventTermCfg) and getattr(term_cfg.func, "__name__", "") not in _PLANT_EVENT_FUNCS:
                 setattr(env_cfg.events, term_name, None)
     else:
         env_cfg.events = type("StrictEventsCfg", (), {})()
