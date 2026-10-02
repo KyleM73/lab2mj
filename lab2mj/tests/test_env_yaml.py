@@ -44,8 +44,8 @@ class TestClassNameParsing:
         assert actuator_model_from_class("isaaclab.actuators.actuator_pd:IdealPDActuator") == "ideal_pd"
         assert actuator_model_from_class("isaaclab.actuators.actuator_pd:DelayedPDActuator") == "delayed_pd"
         assert actuator_model_from_class("isaaclab.actuators.actuator_pd:RemotizedPDActuator") == "remotized_pd"
-        assert actuator_model_from_class("contact_lab.assets.actuators:SyncFreeDelayedPDActuator") == "delayed_pd"
-        assert actuator_model_from_class("contact_lab.assets.actuators:SyncFreeRemotizedPDActuator") == "remotized_pd"
+        assert actuator_model_from_class("contact_lab.assets.actuators:NoHostSyncDelayedPDActuator") == "delayed_pd"
+        assert actuator_model_from_class("contact_lab.assets.actuators:NoHostSyncRemotizedPDActuator") == "remotized_pd"
 
 
 class TestSpotTiming:
@@ -142,7 +142,7 @@ class TestSpotInitAndScene:
 
     def test_sync_free_contact_sensor(self):
         data = load_env_yaml(SPOT_ENV_YAML)
-        data["scene"]["contact_forces"]["class_type"] = "contact_lab.sensors:SyncFreeContactSensor"
+        data["scene"]["contact_forces"]["class_type"] = "contact_lab.sensors:NoHostSyncContactSensor"
         (sensor,) = parse_env_dict(data).contact_sensors
         assert sensor.name == "contact_forces" and sensor.history_length == 4
 
