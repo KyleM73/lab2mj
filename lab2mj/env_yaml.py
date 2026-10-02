@@ -39,15 +39,15 @@ _ACTUATOR_MODELS: dict[str, ActuatorModel] = {
     "IdealPDActuator": "ideal_pd",
     "DelayedPDActuator": "delayed_pd",
     "RemotizedPDActuator": "remotized_pd",
-    "NoHostSyncDelayedPDActuator": "delayed_pd",
-    "NoHostSyncRemotizedPDActuator": "remotized_pd",
+    "HostSyncFreeDelayedPDActuator": "delayed_pd",
+    "HostSyncFreeRemotizedPDActuator": "remotized_pd",
     "TorqueSpeedRemotizedPDActuator": "remotized_pd",
     "DCMotor": "dc_motor",
     "ActuatorNetLSTM": "actuator_net_lstm",
     "ActuatorNetMLP": "actuator_net_mlp",
 }
 
-_CONTACT_SENSOR_CLASSES = {"ContactSensor", "NoHostSyncContactSensor"}
+_CONTACT_SENSOR_CLASSES = {"ContactSensor", "HostSyncFreeContactSensor"}
 
 _OBS_GROUP_META_KEYS = {
     "concatenate_terms",
