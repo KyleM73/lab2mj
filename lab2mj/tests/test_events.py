@@ -639,3 +639,15 @@ def test_randomize_joint_default_pos_offsets_defaults():
     offset = events.joint_default_pos_offset
     assert offset is not None and np.all(np.abs(offset) <= 0.01) and np.any(offset != 0.0)
     np.testing.assert_allclose(robot_map.default_joint_pos, nominal + offset)
+
+
+def test_randomize_joint_default_pos_redraws_around_nominal():
+    model, data, robot_map = make_model_and_map()
+    nominal = robot_map.default_joint_pos.copy()
+    events = EventSet([event("bias", "randomize_joint_default_pos", "reset", {"offset_range": (-0.01, 0.01)})])
+    rng = np.random.default_rng(0)
+    for _ in range(50):
+        events.apply_reset(model, data, robot_map, rng)
+    offset = events.joint_default_pos_offset
+    assert offset is not None and np.all(np.abs(offset) <= 0.01)
+    np.testing.assert_allclose(robot_map.default_joint_pos, nominal + offset)

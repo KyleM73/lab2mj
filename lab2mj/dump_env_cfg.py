@@ -4,7 +4,7 @@ Installs :mod:`lab2mj.isaac_shims` so the isaaclab config layer imports on a
 machine without the Omniverse runtime, loads the task's env config from the gym
 registry exactly like ``isaaclab_tasks.utils.parse_env_cfg``, applies the config
 mutations the training pipeline would apply before dumping (scene-entity prim-path
-resolution, terrain num_envs/env_spacing, optional seed and PhysX buffer scaling),
+resolution, terrain num_envs/env_spacing, optional seed, and contact_lab's PhysX buffer sizing),
 and writes the config through the real ``isaaclab.utils.io.dump_yaml``.
 
 The output is structurally identical to the ``params/env.yaml`` a training run dumps
@@ -97,24 +97,16 @@ def hydra_roundtrip(env_cfg):
     return replace_strings_with_env_cfg_spaces(env_cfg)
 
 
-def scale_physx_buffers(env_cfg) -> None:
-    """Apply the PhysX GPU buffer scaling ``scripts/train.py`` applies before dumping.
+def apply_env_construction(task: str, env_cfg) -> None:
+    """Apply the config changes the task's env class makes on construction, which a config-only dump skips:
+    contact_lab's ``FusedRewardRLEnv`` sizes the PhysX GPU buffers for the env count."""
+    import gymnasium as gym
 
-    Only contact_lab's training entry point does this; stock IsaacLab rsl_rl runs do
-    not. Enable via ``--train_physx_buffers`` when matching a contact_lab run.
-    """
-    if not (hasattr(env_cfg, "sim") and hasattr(env_cfg.sim, "physx")):
+    if gym.spec(task).entry_point != "contact_lab.envs:FusedRewardRLEnv":
         return
-    n = env_cfg.scene.num_envs
-    physx = env_cfg.sim.physx
-    physx.gpu_max_rigid_patch_count = max(physx.gpu_max_rigid_patch_count, 20 * n)
-    physx.gpu_max_rigid_contact_count = max(physx.gpu_max_rigid_contact_count, 64 * n)
-    physx.gpu_found_lost_pairs_capacity = max(physx.gpu_found_lost_pairs_capacity, 64 * n)
-    physx.gpu_found_lost_aggregate_pairs_capacity = max(physx.gpu_found_lost_aggregate_pairs_capacity, 128 * n)
-    physx.gpu_total_aggregate_pairs_capacity = max(physx.gpu_total_aggregate_pairs_capacity, 64 * n)
-    physx.gpu_collision_stack_size = max(physx.gpu_collision_stack_size, 1 << 27)
-    physx.gpu_heap_capacity = max(physx.gpu_heap_capacity, 1 << 27)
-    physx.gpu_temp_buffer_capacity = max(physx.gpu_temp_buffer_capacity, 1 << 25)
+    from contact_lab.envs import size_physx_buffers
+
+    size_physx_buffers(env_cfg.sim.physx, env_cfg.scene.num_envs)
 
 
 def dump_env_cfg(
@@ -123,7 +115,6 @@ def dump_env_cfg(
     num_envs: int | None = None,
     device: str = "cuda:0",
     seed: int | None = None,
-    train_physx_buffers: bool = False,
     use_hydra_roundtrip: bool = True,
 ) -> None:
     """Resolve the env config for ``task`` under shims and dump it to ``out``."""
@@ -149,8 +140,7 @@ def dump_env_cfg(
     if seed is not None:
         env_cfg.seed = seed
     resolve_scene_entities(env_cfg)
-    if train_physx_buffers:
-        scale_physx_buffers(env_cfg)
+    apply_env_construction(task, env_cfg)
     dump_yaml(out, env_cfg)
     print(f"[INFO] dumped {task} -> {out}")
 
@@ -169,11 +159,6 @@ def main(argv: list[str] | None = None) -> int:
         "--seed", type=int, default=None, help="Value written to the seed key (train scripts write the agent seed)."
     )
     parser.add_argument(
-        "--train_physx_buffers",
-        action="store_true",
-        help="Replicate contact_lab train.py's PhysX GPU buffer scaling (contact_lab runs only).",
-    )
-    parser.add_argument(
         "--no_hydra_roundtrip",
         action="store_true",
         help="Skip the OmegaConf round-trip that hydra-based train scripts apply to the config.",
@@ -185,7 +170,6 @@ def main(argv: list[str] | None = None) -> int:
         num_envs=args.num_envs,
         device=args.device,
         seed=args.seed,
-        train_physx_buffers=args.train_physx_buffers,
         use_hydra_roundtrip=not args.no_hydra_roundtrip,
     )
     return 0

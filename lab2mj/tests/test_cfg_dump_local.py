@@ -69,7 +69,6 @@ def test_local_dump_matches_spot_fixture(tmp_path):
         "42",
         "--device",
         "cuda:0",
-        "--train_physx_buffers",
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO)
     assert proc.returncode == 0, proc.stderr

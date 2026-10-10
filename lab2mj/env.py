@@ -694,6 +694,7 @@ class MjEnv:
         self._last_obs: np.ndarray | None = None
         self._episode_step = 0
         self._startup_done = False
+        self._default_pos_offset_applied = np.zeros(self.num_joints, dtype=np.float64)
 
     """
     Construction helpers.
@@ -936,11 +937,10 @@ class MjEnv:
         self.data.qvel[:] = self._default_qvel
         if not self.strict and not self._startup_done:
             self._events.apply_startup(self.model, self.data, self.robot_map, self.rng)
-            if self._events.joint_default_pos_offset is not None:
-                self.action.shift_default_joint_pos(self._events.joint_default_pos_offset)
             self._startup_done = True
         if not self.strict:
             self._events.apply_reset(self.model, self.data, self.robot_map, self.rng)
+            self._follow_default_joint_pos_offset()
         return self._finish_reset()
 
     def reset_from_state(
@@ -1076,6 +1076,7 @@ class MjEnv:
             generator.step(self.policy_dt, state, self.rng)
         if not self.strict:
             if self._events.step_interval(self.policy_dt, self.model, self.data, self.robot_map, self.rng):
+                self._follow_default_joint_pos_offset()
                 mujoco.mj_forward(self.model, self.data)
 
         obs = self._compute_obs()
@@ -1271,6 +1272,14 @@ class MjEnv:
         for generator in self._commands.values():
             generator.reset(self.rng, state)
 
+    def _follow_default_joint_pos_offset(self) -> None:
+        """Move the action's default offset by the change in the events' default-joint-position offset."""
+        offset = self._events.joint_default_pos_offset
+        if offset is None or np.array_equal(offset, self._default_pos_offset_applied):
+            return
+        self.action.shift_default_joint_pos(offset - self._default_pos_offset_applied)
+        self._default_pos_offset_applied = offset.copy()
+
     def _auto_reset(self) -> None:
         """Mid-rollout episode reset (non-strict), mirroring ``_reset_idx``.
 
@@ -1279,6 +1288,7 @@ class MjEnv:
         """
         self.data.xfrc_applied[:] = 0.0
         self._events.apply_reset(self.model, self.data, self.robot_map, self.rng)
+        self._follow_default_joint_pos_offset()
         mujoco.mj_forward(self.model, self.data)
         self._episode_step = 0
         self._last_action_raw = np.zeros(self.action_dim, dtype=np.float32)

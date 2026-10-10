@@ -37,8 +37,6 @@ REPO = Path(__file__).resolve().parents[1]
 ALLOWLIST = {"log_dir", "io_descriptors_output_dir", "seed", "sim.device"}
 
 # (name, ground-truth glob -- `logs/...` relative to --logs_root, else to this repo -- task id, extra dumper args).
-# --train_physx_buffers replicates contact_lab train.py's PhysX buffer scaling and is
-# only used for runs trained through contact_lab's scripts/train.py.
 CASES: list[tuple[str, str, str, list[str]]] = [
     ("anymal_b_flat", "logs/anymal_b_flat/*/params/env.yaml", "Isaac-Velocity-Flat-Anymal-B-v0", []),
     ("anymal_b_rough", "logs/anymal_b_rough/*/params/env.yaml", "Isaac-Velocity-Rough-Anymal-B-v0", []),
@@ -59,13 +57,8 @@ CASES: list[tuple[str, str, str, list[str]]] = [
     ("unitree_go2_flat", "logs/unitree_go2_flat/*/params/env.yaml", "Isaac-Velocity-Flat-Unitree-Go2-v0", []),
     ("unitree_go2_rough", "logs/unitree_go2_rough/*/params/env.yaml", "Isaac-Velocity-Rough-Unitree-Go2-v0", []),
     ("spot_flat_stock", "logs/spot_flat_stock/*/params/env.yaml", "Isaac-Velocity-Flat-Spot-v0", []),
-    ("spot_velocity", "logs/spot_velocity/*/params/env.yaml", "spot-velocity-v0", ["--train_physx_buffers"]),
-    (
-        "spot_velocity_fixture",
-        "lab2mj/tests/fixtures/spot_velocity_env.yaml",
-        "spot-velocity-v0",
-        ["--train_physx_buffers"],
-    ),
+    ("spot_velocity", "logs/spot_velocity/*/params/env.yaml", "spot-velocity-v0", []),
+    ("spot_velocity_fixture", "lab2mj/tests/fixtures/spot_velocity_env.yaml", "spot-velocity-v0", []),
 ]
 
 

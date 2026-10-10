@@ -32,9 +32,10 @@ Semantics notes vs Isaac/PhysX:
 * Root velocities follow Isaac's ``write_root_velocity_to_sim``: the sampled 6-vector is
   the root **CoM** velocity in world frame. The MuJoCo free joint stores
   ``[lin vel of body-frame origin (world), ang vel (body frame)]``, so we convert.
-* ``randomize_joint_default_pos`` (contact_lab encoder calibration bias): offsets the default
-  joint positions in place; the runtime shifts the joint-position action offset by
-  :attr:`EventSet.joint_default_pos_offset` after the startup events, as the Isaac term does.
+* ``randomize_joint_default_pos`` (contact_lab encoder calibration bias): sets the default
+  joint positions to the nominal pose plus a fresh offset on every call (it never accumulates);
+  the runtime moves the joint-position action offset with
+  :attr:`EventSet.joint_default_pos_offset` after each event pass, as the Isaac term does.
 * contact_lab's ``check_joint_friction`` (an Isaac-side config check) is accepted and does
   nothing at runtime.
 * All events no-op in strict mode.
@@ -349,7 +350,9 @@ class EventSet:
                     )
         self._events = [e for e in events if class_name(e.func) not in self._STRICT_ONLY_FUNCS + self._NOOP_FUNCS]
         self.joint_default_pos_offset: np.ndarray | None = None
-        """Accumulated ``randomize_joint_default_pos`` offset (J,), Isaac order; None if never applied."""
+        """Current ``randomize_joint_default_pos`` offset (J,) from the nominal default pose, Isaac order; None if
+        never applied."""
+        self._nominal_default_joint_pos: np.ndarray | None = None
         self._terrain_static_friction = float(terrain_static_friction)
         self._friction_combine_mode = str(friction_combine_mode)
         if has_material_event:
@@ -575,12 +578,12 @@ class EventSet:
     ) -> None:
         joint_idx = _matched_joint_indices(params, robot_map)
         lo, hi = params["offset_range"]
+        if self._nominal_default_joint_pos is None:
+            self._nominal_default_joint_pos = robot_map.default_joint_pos.copy()
         offset = np.zeros(len(robot_map.default_joint_pos), dtype=np.float64)
         offset[joint_idx] = rng.uniform(lo, hi, len(joint_idx))
-        robot_map.default_joint_pos += offset
-        self.joint_default_pos_offset = (
-            offset if self.joint_default_pos_offset is None else self.joint_default_pos_offset + offset
-        )
+        robot_map.default_joint_pos[:] = self._nominal_default_joint_pos + offset
+        self.joint_default_pos_offset = offset
 
     def _reset_joints_around_default(
         self, model: mujoco.MjModel, data: mujoco.MjData, robot_map: RobotMap, rng: np.random.Generator, params: dict
