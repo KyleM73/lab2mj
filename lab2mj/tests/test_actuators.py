@@ -65,8 +65,8 @@ class TestSpotFixture:
         assert models == {"spot_hip": "delayed_pd", "spot_knee": "remotized_pd"}
         np.testing.assert_allclose(aset.kp, 60.0)
         np.testing.assert_allclose(aset.kd, 1.5)
-        # Hips: DelayedPD effort box of 90; knees: RemotizedPD forces the box to inf.
-        np.testing.assert_allclose(aset.effort_limit[:8], 90.0)
+        # Hips: DelayedPD effort box of 45; knees: RemotizedPD forces the box to inf.
+        np.testing.assert_allclose(aset.effort_limit[:8], 45.0)
         assert np.all(np.isinf(aset.effort_limit[8:]))
 
     def test_group_resolution_follows_joint_list_order(self):
@@ -83,18 +83,34 @@ class TestSpotFixture:
         assert knee_ir.joint_parameter_lookup.shape == (101, 3)
         aset = _spot_actuator_set()
         by_name = {g.name: g for g in aset.groups}
-        assert (by_name["spot_hip"].min_delay, by_name["spot_hip"].max_delay) == (0, 2)
+        assert (by_name["spot_hip"].min_delay, by_name["spot_hip"].max_delay) == (0, 1)
         assert (by_name["spot_knee"].min_delay, by_name["spot_knee"].max_delay) == (0, 1)
         assert by_name["spot_knee"].lut_angle is not None
         assert by_name["spot_knee"].lut_angle.shape == (101,)
         assert np.all(np.diff(by_name["spot_knee"].lut_angle) > 0)
 
+    def test_no_joint_friction(self):
+        aset = _spot_actuator_set()
+        assert aset.builder_overrides() == {}
+        np.testing.assert_allclose(aset.viscous_friction, 0.0)
+
     def test_static_friction_does_not_convert(self):
-        # Spot authors only the static friction effort (PhysX >= 5: a breakaway
-        # threshold on stationary joints) — no dynamic/viscous friction and no
-        # armature, so no model overrides and a warning about the dropped breakaway.
+        # Static friction effort only (PhysX >= 5: a breakaway threshold on stationary
+        # joints), no dynamic/viscous friction and no armature: no model overrides and a
+        # warning about the dropped breakaway.
+        groups = [
+            ActuatorGroupIR(
+                name="grp",
+                joint_names_expr=["a", "b"],
+                model="ideal_pd",
+                stiffness=10.0,
+                damping=1.0,
+                effort_limit=50.0,
+                friction=0.18,
+            )
+        ]
         with pytest.warns(UserWarning, match="static friction"):
-            aset = _spot_actuator_set()
+            aset = ActuatorSet.from_ir(groups, ["a", "b"])
         assert aset.builder_overrides() == {}
         np.testing.assert_allclose(aset.viscous_friction, 0.0)
 

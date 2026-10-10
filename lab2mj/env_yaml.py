@@ -365,6 +365,18 @@ def _parse_terrain(cfg: dict[str, Any] | None, scene: dict[str, Any] | None = No
     )
 
 
+def _robot_usd_path(spawn: dict[str, Any]) -> str | None:
+    """The robot USD: ``spawn.usd_path``, or for a URDF spawn the USD Isaac Lab's ``UrdfConverter`` writes to
+    ``usd_dir/usd_file_name`` when the env is first created."""
+    if spawn.get("usd_path"):
+        return str(spawn["usd_path"])
+    asset_path, usd_dir = spawn.get("asset_path"), spawn.get("usd_dir")
+    if not (isinstance(asset_path, str) and asset_path.endswith(".urdf") and usd_dir):
+        return None
+    usd_file_name = spawn.get("usd_file_name") or Path(asset_path).with_suffix(".usd").name
+    return str(Path(usd_dir) / usd_file_name)
+
+
 def find_robot_cfg(scene: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     """The robot articulation's scene entry: ``(scene key, cfg dict)``.
 
@@ -480,7 +492,7 @@ def parse_env_dict(data: dict[str, Any]) -> EnvIR:
         action=_parse_action(data.get("actions")),
         seed=data.get("seed"),
         gravity_w=tuple(float(g) for g in gravity),
-        usd_path=spawn.get("usd_path"),
+        usd_path=_robot_usd_path(spawn),
         actuators=_parse_actuators(robot.get("actuators")),
         obs_groups=_parse_obs_groups(data.get("observations")),
         commands=_parse_commands(data.get("commands")),

@@ -16,6 +16,7 @@ import numpy as np
 _ROBOT_CFGS: dict[str, tuple[str, str]] = {
     "spot": ("contact_lab.assets.spot", "SPOT_CFG"),
     "g1": ("isaaclab_assets", "G1_MINIMAL_CFG"),
+    "contact_lab_g1": ("contact_lab.assets.g1", "G1_CFG"),
     # The velocity tasks run the MINIMAL variant (h1_minimal.usd).
     "h1": ("isaaclab_assets", "H1_MINIMAL_CFG"),
     "a1": ("isaaclab_assets", "UNITREE_A1_CFG"),

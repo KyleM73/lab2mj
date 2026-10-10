@@ -28,18 +28,20 @@ sim:
   use_fabric: true
   physx:
     solver_type: 1
+    solve_articulation_contact_last: false
     min_position_iteration_count: 1
     max_position_iteration_count: 255
     min_velocity_iteration_count: 0
     max_velocity_iteration_count: 255
     enable_ccd: false
     enable_stabilization: false
+    enable_external_forces_every_iteration: false
     enable_enhanced_determinism: false
     bounce_threshold_velocity: 0.5
     friction_offset_threshold: 0.04
     friction_correlation_distance: 0.025
     gpu_max_rigid_contact_count: 8388608
-    gpu_max_rigid_patch_count: 163840
+    gpu_max_rigid_patch_count: 262144
     gpu_found_lost_pairs_capacity: 2097152
     gpu_found_lost_aggregate_pairs_capacity: 33554432
     gpu_total_aggregate_pairs_capacity: 2097152
@@ -49,7 +51,6 @@ sim:
     gpu_max_num_partitions: 8
     gpu_max_soft_body_contacts: 1048576
     gpu_max_particle_contacts: 1048576
-    solve_articulation_contact_last: false
   physics_material:
     func: isaaclab.sim.spawners.materials.physics_materials:spawn_rigid_body_material
     static_friction: 1.0
@@ -75,6 +76,9 @@ sim:
     carb_settings: null
     rendering_mode: null
   create_stage_in_memory: false
+  logging_level: WARNING
+  save_logs_to_file: true
+  log_dir: null
 ui_window_class_type: isaaclab.envs.ui.manager_based_rl_env_window:ManagerBasedRLEnvWindow
 seed: 42
 decimation: 4
@@ -161,33 +165,33 @@ scene:
     soft_joint_pos_limit_factor: 0.9
     actuators:
       spot_hip:
-        class_type: isaaclab.actuators.actuator_pd:DelayedPDActuator
+        class_type: contact_lab.assets.actuators:HostSyncFreeDelayedPDActuator
         joint_names_expr:
         - .*_h[xy]
-        effort_limit: 90.0
+        effort_limit: 45.0
         velocity_limit: 20.0
         effort_limit_sim: null
-        velocity_limit_sim: null
+        velocity_limit_sim: 20.0
         stiffness: 60.0
         damping: 1.5
         armature: null
-        friction: 0.008
+        friction: null
         dynamic_friction: null
         viscous_friction: null
         min_delay: 0
-        max_delay: 2
+        max_delay: 1
       spot_knee:
-        class_type: isaaclab.actuators.actuator_pd:RemotizedPDActuator
+        class_type: contact_lab.assets.actuators:TorqueSpeedRemotizedPDActuator
         joint_names_expr:
         - .*_kn
         effort_limit: null
         velocity_limit: 20.0
         effort_limit_sim: null
-        velocity_limit_sim: null
+        velocity_limit_sim: 25.03
         stiffness: 60.0
         damping: 1.5
         armature: null
-        friction: 0.18
+        friction: null
         dynamic_friction: null
         viscous_friction: null
         min_delay: 0
@@ -496,6 +500,12 @@ scene:
         - - -0.2471
           - -20.401667
           - 30.6025
+        max_torque: 97.0
+        min_torque: -108.79
+        max_speed: 25.03
+        min_speed: -22.22
+        max_flat_speed: 9.48
+        min_flat_speed: -8.32
     actuator_value_resolution_debug_print: false
   terrain:
     class_type: isaaclab.terrains.terrain_importer:TerrainImporter
@@ -506,6 +516,7 @@ scene:
     terrain_generator: null
     usd_path: null
     env_spacing: 3.0
+    use_terrain_origins: true
     visual_material:
       func: isaaclab.sim.spawners.materials.visual_materials:spawn_preview_surface
       diffuse_color: !!python/tuple
@@ -531,13 +542,14 @@ scene:
     max_init_terrain_level: null
     debug_vis: false
   contact_forces:
-    class_type: isaaclab.sensors.contact_sensor.contact_sensor:ContactSensor
+    class_type: contact_lab.sensors:HostSyncFreeContactSensor
     prim_path: /World/envs/env_.*/Robot/.*
     update_period: 0.005
     history_length: 4
     debug_vis: false
     track_pose: false
     track_contact_points: false
+    track_friction_forces: false
     max_contact_data_count_per_prim: 4
     track_air_time: true
     force_threshold: 1.0
@@ -597,6 +609,7 @@ scene:
           physics_material_path: material
           physics_material: null
           radius: 0.02
+    track_touchdown_velocity: true
   sky_light:
     class_type: null
     prim_path: /World/skyLight
@@ -639,12 +652,13 @@ recorders:
     _name_: EXPORT_ALL
     _sort_order_: 1
   export_in_record_pre_reset: true
+  export_in_close: false
 observations:
   policy:
     concatenate_terms: true
     concatenate_dim: -1
     enable_corruption: true
-    history_length: 1
+    history_length: null
     flatten_history_dim: true
     base_lin_vel:
       func: isaaclab.envs.mdp.observations:base_lin_vel
@@ -734,13 +748,17 @@ observations:
     concatenate_terms: true
     concatenate_dim: -1
     enable_corruption: false
-    history_length: 1
+    history_length: null
     flatten_history_dim: true
     base_lin_vel:
       func: isaaclab.envs.mdp.observations:base_lin_vel
       params: {}
       modifiers: null
-      noise: null
+      noise:
+        func: isaaclab.utils.noise.noise_model:uniform_noise
+        operation: add
+        n_min: -0.1
+        n_max: 0.1
       clip: null
       scale: null
       history_length: 0
@@ -749,7 +767,11 @@ observations:
       func: isaaclab.envs.mdp.observations:base_ang_vel
       params: {}
       modifiers: null
-      noise: null
+      noise:
+        func: isaaclab.utils.noise.noise_model:uniform_noise
+        operation: add
+        n_min: -0.1
+        n_max: 0.1
       clip: null
       scale: null
       history_length: 0
@@ -758,7 +780,11 @@ observations:
       func: isaaclab.envs.mdp.observations:projected_gravity
       params: {}
       modifiers: null
-      noise: null
+      noise:
+        func: isaaclab.utils.noise.noise_model:uniform_noise
+        operation: add
+        n_min: -0.05
+        n_max: 0.05
       clip: null
       scale: null
       history_length: 0
@@ -777,7 +803,11 @@ observations:
       func: isaaclab.envs.mdp.observations:joint_pos_rel
       params: {}
       modifiers: null
-      noise: null
+      noise:
+        func: isaaclab.utils.noise.noise_model:uniform_noise
+        operation: add
+        n_min: -0.05
+        n_max: 0.05
       clip: null
       scale: null
       history_length: 0
@@ -786,7 +816,11 @@ observations:
       func: isaaclab.envs.mdp.observations:joint_vel_rel
       params: {}
       modifiers: null
-      noise: null
+      noise:
+        func: isaaclab.utils.noise.noise_model:uniform_noise
+        operation: add
+        n_min: -0.5
+        n_max: 0.5
       clip: null
       scale: null
       history_length: 0
@@ -849,6 +883,36 @@ events:
       - 0.0
       - 0.0
       num_buckets: 64
+    mode: startup
+    interval_range_s: null
+    is_global_time: false
+    min_step_count_between_reset: 0
+  joint_friction_check:
+    func: contact_lab.tasks.base_wrench.mdp.events:check_joint_friction
+    params:
+      asset_cfg:
+        name: robot
+        joint_names: null
+        joint_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        fixed_tendon_names: null
+        fixed_tendon_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        body_names: null
+        body_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        object_collection_names: null
+        object_collection_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        preserve_order: false
     mode: startup
     interval_range_s: null
     is_global_time: false
@@ -1023,13 +1087,13 @@ events:
     is_global_time: false
     min_step_count_between_reset: 0
 rerender_on_reset: false
+num_rerenders_on_reset: 0
 wait_for_textures: true
 xr: null
 teleop_devices:
   devices: {}
 export_io_descriptors: false
-io_descriptors_output_dir: null
-log_dir: /home/user/contact_lab/logs/spot_velocity/2026-05-11_01-04-26_vanilla
+log_dir: /home/apptronik/contact_lab_upgrade/logs/spot_velocity/2026-10-10_02-13-38_fixture_dump
 is_finite_horizon: false
 episode_length_s: 20.0
 rewards:
@@ -1372,7 +1436,35 @@ rewards:
         - null
         preserve_order: false
       cutoff: 10.0
-    weight: -1.0
+    weight: 0.0
+  foot_touchdown_velocity:
+    func: contact_lab.tasks.base_wrench.mdp.rewards:foot_touchdown_velocity_penalty
+    params:
+      sensor_cfg:
+        name: contact_forces
+        joint_names: null
+        joint_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        fixed_tendon_names: null
+        fixed_tendon_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        body_names: .*foot
+        body_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        object_collection_names: null
+        object_collection_ids: !!python/object/apply:builtins.slice
+        - null
+        - null
+        - null
+        preserve_order: false
+      cutoff: 10.0
+    weight: -0.077
   foot_force:
     func: contact_lab.tasks.base_wrench.mdp.rewards:foot_force_reward
     params:
@@ -1474,7 +1566,6 @@ rewards:
         - null
         - null
         preserve_order: false
-      std: 0.1
       threshold: 1.0
     weight: -1.0
   foot_slip:
@@ -1788,7 +1879,13 @@ curriculum:
     func: isaaclab.envs.mdp.curriculums:modify_reward_weight
     params:
       term_name: foot_impact_velocity
-      weight: -60.0
+      weight: 0.0
+      num_steps: 192000
+  foot_touchdown_velocity:
+    func: isaaclab.envs.mdp.curriculums:modify_reward_weight
+    params:
+      term_name: foot_touchdown_velocity
+      weight: -4.6
       num_steps: 192000
   foot_force_penalty:
     func: isaaclab.envs.mdp.curriculums:modify_reward_weight

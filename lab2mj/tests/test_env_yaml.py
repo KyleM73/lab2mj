@@ -7,6 +7,7 @@ from lab2mj.env_yaml import (
     _parse_noise,
     _parse_obs_groups,
     _parse_terrain,
+    _robot_usd_path,
     actuator_model_from_class,
     class_name,
     load_env_yaml,
@@ -72,7 +73,7 @@ class TestSpotObservations:
         ]
         assert policy.enable_corruption is True
         assert policy.concatenate_terms is True
-        assert policy.history_length == 1
+        assert policy.history_length is None
 
     def test_noise_ranges(self, spot_ir: EnvIR):
         policy = spot_ir.obs_group("policy")
@@ -99,7 +100,6 @@ class TestSpotObservations:
         critic = spot_ir.obs_group("critic")
         assert critic.enable_corruption is False
         assert len(critic.terms) == 7
-        assert all(t.noise is None for t in critic.terms)
 
 
 class TestSpotAction:
@@ -122,8 +122,9 @@ class TestSpotActuators:
         assert knee.stiffness == 60.0
         assert knee.damping == 1.5
         assert knee.effort_limit is None
-        assert knee.friction == 0.18
+        assert knee.friction is None
         assert (knee.min_delay, knee.max_delay) == (0, 1)
+        assert knee.torque_speed_envelope == [97.0, -108.79, 25.03, -22.22, 9.48, -8.32]
         lut = knee.joint_parameter_lookup
         assert lut is not None and lut.shape == (101, 3)
         np.testing.assert_allclose(lut[0], [-2.7929, -24.776718, 37.165077])
@@ -435,3 +436,12 @@ class TestPhysicsMaterials:
 class TestSolverPositionIterations:
     def test_spot_articulation_tgs_iterations(self, spot_ir: EnvIR):
         assert spot_ir.solver_position_iterations == 4
+
+
+def test_robot_usd_path_from_urdf_spawn():
+    # A URDF spawn has no usd_path: the robot USD is the one Isaac Lab's UrdfConverter writes.
+    spawn = {"asset_path": "/a/g1.urdf", "usd_dir": "/cache/g1_urdf", "usd_file_name": "g1.usd"}
+    assert _robot_usd_path(spawn) == "/cache/g1_urdf/g1.usd"
+    assert _robot_usd_path(spawn | {"usd_file_name": None}) == "/cache/g1_urdf/g1.usd"
+    assert _robot_usd_path({"usd_path": "/a/robot.usd"}) == "/a/robot.usd"
+    assert _robot_usd_path({}) is None

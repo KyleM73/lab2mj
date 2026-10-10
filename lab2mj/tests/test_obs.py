@@ -57,8 +57,7 @@ Fixture-driven layout tests.
 def test_spot_fixture_policy_layout():
     ir = parse_fixture("spot_velocity_env.yaml")
     group = ir.obs_group("policy")
-    # Spot velocity uses a group-level history_length=1 override.
-    assert group.history_length == 1
+    assert group.history_length is None
     pipeline = ObsPipeline(group, num_joints=12, action_dim=12, command_dims={"base_velocity": 3})
 
     assert pipeline.obs_dim == 48
@@ -85,11 +84,10 @@ def test_spot_fixture_policy_layout():
 
 @pytest.mark.parametrize(
     "fixture,num_joints,obs_dim,history_length",
-    [("spot_velocity_env.yaml", 12, 48, 1), ("g1_flat_env.yaml", 37, 123, None)],
+    [("spot_velocity_env.yaml", 12, 48, None), ("g1_flat_env.yaml", 37, 123, None)],
 )
 def test_fixture_policy_values_strict(fixture, num_joints, obs_dim, history_length):
-    # Both velocity fixtures share the same 7-term block; Spot adds a group-level
-    # history_length=1 override, G1 has none.
+    # Both velocity fixtures share the same 7-term block and no group-level history.
     ir = parse_fixture(fixture)
     group = ir.obs_group("policy")
     assert group.history_length == history_length

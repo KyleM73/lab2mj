@@ -8,6 +8,7 @@ import mujoco
 import numpy as np
 import pytest
 
+from lab2mj.env_yaml import class_name
 from lab2mj.events import EventSet, RobotMap, read_root_com_vel_w, resolve_names
 from lab2mj.ir import EventIR
 from lab2mj.quat import quat_from_euler_xyz
@@ -560,7 +561,8 @@ def test_every_fixture_event_is_supported(fixture):
     ir = parse_fixture(fixture)
     assert ir.events, "fixture should declare events"
     events = EventSet(ir.events)  # unknown funcs would raise
-    assert len(ir.events) == len(events._events)
+    applied = [e for e in ir.events if class_name(e.func) not in EventSet._NOOP_FUNCS]
+    assert len(applied) == len(events._events)
 
 
 def test_g1_fixture_events_apply_on_toy_model():

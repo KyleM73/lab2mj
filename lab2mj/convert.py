@@ -170,7 +170,10 @@ def resolve_usd(usd_arg: str | Path | None, ir: EnvIR, cache_dir: Path = USD_CAC
     if not ir.usd_path.startswith(("http://", "https://")):
         path = Path(ir.usd_path)
         if not path.is_file():
-            raise FileNotFoundError(f"env.yaml usd_path {path} does not exist locally; pass --usd")
+            raise FileNotFoundError(
+                f"robot USD {path} does not exist locally; pass --usd (a URDF-spawned robot's USD is written there "
+                "when Isaac Lab first creates the env: copy that directory from the machine that ran it)"
+            )
         return path
     return _download_usd_with_dependencies(ir.usd_path, cache_dir)
 
