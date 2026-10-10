@@ -35,5 +35,8 @@ python -m lab2mj.isaac.dump_freespace --robot <name> --out freespace.npz   # pla
 python -m lab2mj.isaac.dump_contact   --robot <name> --out contact.npz     # contact parity
 ```
 
+`--solver_iterations P,V` overrides the robot's PhysX solver (position/velocity) iterations; the default keeps the
+task's. contact_lab's G1 trains at 4/0, which PhysX does not converge; dump its references at `--solver_iterations 32,4`.
+
 `scripts/` holds the MuJoCo-side replay, calibration, and aggregation counterparts.
 Bundles, dumps, and caches live under `data/` (gitignored; `LAB2MJ_DATA_DIR` overrides).

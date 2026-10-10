@@ -31,6 +31,39 @@ ROBOT_CHOICES = tuple(_ROBOT_CFGS)
 # Effectively-unlimited PhysX solver clamp for pure-torque protocols.
 RAW_TORQUE_LIMIT = 1.0e9
 
+
+def add_solver_iterations_arg(parser: Any) -> None:
+    """Add ``--solver_iterations`` (see :func:`set_solver_iterations`) to a dumper's parser."""
+    parser.add_argument(
+        "--solver_iterations",
+        default="task",
+        help="Robot PhysX solver 'position,velocity' iteration counts, or 'task' (default) to keep the counts the "
+        "robot cfg authors. Training counts can leave the TGS solve unconverged: contact_lab's 29-DoF G1 at 4/0 "
+        "misses the open_loop gate by 2.7x and passes at 32,4, while Spot matches its bundle at its own 4/0.",
+    )
+
+
+def set_solver_iterations(articulation_cfg: Any, spec: str) -> np.ndarray:
+    """Apply a ``--solver_iterations`` value to an articulation cfg; returns the (position, velocity) counts the cfg
+    now authors, -1 where it leaves the USD-authored value."""
+    import isaaclab.sim as sim_utils
+
+    spawn = articulation_cfg.spawn
+    if spec != "task":
+        position, velocity = (int(v) for v in spec.split(","))
+        if spawn.articulation_props is None:
+            spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg()
+        spawn.articulation_props.solver_position_iteration_count = position
+        spawn.articulation_props.solver_velocity_iteration_count = velocity
+    props = spawn.articulation_props
+    counts = (
+        (None, None)
+        if props is None
+        else (props.solver_position_iteration_count, props.solver_velocity_iteration_count)
+    )
+    return np.array([-1 if c is None else int(c) for c in counts])
+
+
 # Articulation state every dumper records per step, under the reference-dump
 # key/frame conventions (root_lin_vel_w = root CoM velocity, root_link_lin_vel_w
 # = link-origin velocity, both world frame; quaternions wxyz).

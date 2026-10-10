@@ -171,7 +171,7 @@ only matters if a termination fires, which already invalidates the reference
 # Isaac Sim must launch before any isaaclab import (see CLAUDE.md: Import Ordering).
 import argparse
 
-from lab2mj.isaac.dump_common import launch_app
+from lab2mj.isaac.dump_common import add_solver_iterations_arg, launch_app
 
 parser = argparse.ArgumentParser(description="Dump a deterministic Isaac reference trajectory for sim2sim validation.")
 parser.add_argument("--task", type=str, required=True, help="Manager-based task id (e.g. Isaac-Velocity-Flat-G1-v0).")
@@ -219,6 +219,7 @@ parser.add_argument(
     "contact-sensor history to cover one full decimation window. Joint/root states remain per-policy-step: "
     "IsaacLab exposes no mid-step articulation state.",
 )
+add_solver_iterations_arg(parser)
 args_cli, simulation_app = launch_app(parser)
 
 import os
@@ -235,7 +236,7 @@ from isaaclab.managers import CommandTermCfg, EventTermCfg, ObservationGroupCfg
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab_tasks.utils import parse_env_cfg
 
-from lab2mj.isaac.dump_common import append_state, plant_record, shutdown
+from lab2mj.isaac.dump_common import append_state, plant_record, set_solver_iterations, shutdown
 
 
 def _parse_floats(spec: str, n: int, name: str) -> list[float]:
@@ -459,6 +460,7 @@ def main() -> None:
         env_cfg.export_io_descriptors = False
     if args_cli.strict:
         _apply_strict_overrides(env_cfg, vel_cmd, pose_cmd)
+    solver_iterations = set_solver_iterations(env_cfg.scene.robot, args_cli.solver_iterations)
     if args_cli.record_physics_steps:
         _enable_physics_rate_contact_history(env_cfg.scene, int(env_cfg.decimation))
 
@@ -649,6 +651,7 @@ def main() -> None:
         "policy_path": np.array(os.path.abspath(args_cli.policy)),
         "seed": np.array(args_cli.seed),
         "strict": np.array(bool(args_cli.strict)),
+        "solver_iterations": solver_iterations,
         "command": np.array(vel_cmd, dtype=np.float64),
         **plant_record(robot),
         "physics_dt": np.array(menv.cfg.sim.dt),

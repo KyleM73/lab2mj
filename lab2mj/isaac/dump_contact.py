@@ -32,7 +32,7 @@ Usage::
 # Isaac Sim must launch before any isaaclab import (see CLAUDE.md: Import Ordering).
 import argparse
 
-from lab2mj.isaac.dump_common import ROBOT_CHOICES, launch_app
+from lab2mj.isaac.dump_common import ROBOT_CHOICES, add_solver_iterations_arg, launch_app
 
 parser = argparse.ArgumentParser(description="Dump passive contact-drop references for sim2sim contact parity.")
 parser.add_argument(
@@ -46,6 +46,7 @@ parser.add_argument("--physics_dt", type=float, default=0.005, help="Physics ste
 parser.add_argument("--num_steps", type=int, default=120, help="Physics steps per phase (0.6 s at 5 ms).")
 parser.add_argument("--seed", type=int, default=42, help="Torch seed (inert: the protocol is deterministic).")
 parser.add_argument("--out", type=str, required=True, help="Output npz path.")
+add_solver_iterations_arg(parser)
 args_cli, simulation_app = launch_app(parser)
 
 import os
@@ -60,6 +61,7 @@ from lab2mj.isaac.dump_common import (
     load_robot_cfg,
     plant_record,
     reset_to_default_state,
+    set_solver_iterations,
     shutdown,
     state_recorder,
     to_numpy,
@@ -145,6 +147,7 @@ def _run_drop(sim, robot, drop_m: float, num_steps: int, hold: bool = False) -> 
 def main() -> None:
     torch.manual_seed(args_cli.seed)
     robot_cfg = _implicit_cfg(load_robot_cfg(args_cli.robot))
+    solver_iterations = set_solver_iterations(robot_cfg, args_cli.solver_iterations)
 
     sim_cfg = sim_utils.SimulationCfg(dt=args_cli.physics_dt, device=args_cli.device or "cuda:0")
     sim = sim_utils.SimulationContext(sim_cfg)
@@ -190,6 +193,7 @@ def main() -> None:
 
     out_dir = os.path.dirname(os.path.abspath(args_cli.out))
     os.makedirs(out_dir, exist_ok=True)
+    arrays["solver_iterations"] = solver_iterations
     np.savez_compressed(args_cli.out, **arrays)
     print(f"[contact] dumped {args_cli.robot} contact drops to {args_cli.out}")
 

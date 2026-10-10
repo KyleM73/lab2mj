@@ -20,9 +20,9 @@ Invariants that make the comparison meaningful:
   1e9`` remove every drive/clamp contribution. The armature and friction
   values PhysX actually received are read back from the physx view and
   stored in the npz.
-* Self-collisions are disabled (the no-contact invariant; the rest of the
-  authored ``articulation_props``, including the solver iteration counts,
-  is kept).
+* Self-collisions are disabled (the no-contact invariant); the solver iteration
+  counts follow ``--solver_iterations``, and the rest of the authored
+  ``articulation_props`` is kept.
 * Joint position limits are widened to ±2π on the PhysX side — its maximum
   for revolute joints; unlimited joints keep their wider sentinel, and a
   refused write raises via a read-back check (the phase excursions exceed
@@ -155,7 +155,7 @@ Example commands::
 import argparse
 import sys
 
-from lab2mj.isaac.dump_common import ROBOT_CHOICES, launch_app
+from lab2mj.isaac.dump_common import ROBOT_CHOICES, add_solver_iterations_arg, launch_app
 
 PHASE_CHOICES = ("passive", "excited", "both")
 
@@ -193,6 +193,7 @@ parser.add_argument(
     "A[j] = min(0.25 * min(effort_limit_authored[j], 60), excite_accel * reflected_inertia[j]).",
 )
 parser.add_argument("--out", type=str, required=True, help="Output npz path.")
+add_solver_iterations_arg(parser)
 args_cli, simulation_app = launch_app(parser)
 
 import os
@@ -209,6 +210,7 @@ from lab2mj.isaac.dump_common import (
     load_robot_cfg,
     plant_record,
     reset_to_default_state,
+    set_solver_iterations,
     shutdown,
     state_recorder,
     to_numpy,
@@ -240,7 +242,7 @@ def _freespace_cfg(base_cfg: Any) -> Any:
     cfg.init_state.lin_vel = (0.0, 0.0, 0.0)
     cfg.init_state.ang_vel = (0.0, 0.0, 0.0)
     # No-contact invariant: nothing else is spawned, so self-collision is the only
-    # possible contact source; the solver settings in articulation_props stay authored.
+    # possible contact source.
     if cfg.spawn.articulation_props is None:
         cfg.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(enabled_self_collisions=False)
     else:
@@ -384,6 +386,7 @@ def main() -> None:
     torch.manual_seed(args_cli.seed)
     base_cfg = load_robot_cfg(args_cli.robot)
     robot_cfg = _freespace_cfg(base_cfg)
+    solver_iterations = set_solver_iterations(robot_cfg, args_cli.solver_iterations)
 
     # CPU by default (see the --device override above the parser).
     device = str(args_cli.device)
@@ -515,6 +518,7 @@ def main() -> None:
 
     out_dir = os.path.dirname(os.path.abspath(args_cli.out))
     os.makedirs(out_dir, exist_ok=True)
+    arrays["solver_iterations"] = solver_iterations
     np.savez_compressed(args_cli.out, **arrays)
     print(f"[INFO] Dumped phases {phases} for robot '{args_cli.robot}' to {args_cli.out}")
 

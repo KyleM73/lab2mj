@@ -36,8 +36,11 @@ python -m lab2mj.isaac.dump_freespace --robot <name> --out <freespace.npz>
 python -m lab2mj.isaac.dump_contact --robot <name> --out <contact.npz>
 ```
 
-Dumps are self-describing (task, policy path, seed, commands) — the exact
-invocation is reconstructable from the npz. PhysX GPU rollouts are NOT
+Dumps are self-describing (task, policy path, seed, commands, solver iterations) —
+the exact invocation is reconstructable from the npz. If the open_loop gate misses
+on a robot trained at low solver iterations, re-dump with `--solver_iterations 32,4`:
+contact_lab's 29-DoF G1 at 4/0 is not converged (0.133 rad, 0.025 at 32/4), while
+Spot matches its bundle only at its own 4/0. PhysX GPU rollouts are NOT
 run-to-run deterministic: pin dumps between comparisons; never attribute
 metric drift to code without a fixed dump.
 
